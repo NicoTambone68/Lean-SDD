@@ -1,0 +1,55 @@
+# pycache
+**/__pycache__/
+*.py[cod]
+
+# local environment / secrets
+.env
+.env.*
+!.env.example
+
+# ignore all the log files
+*.log
+
+# ignore all the zip files, thus the trained models
+*.zip
+!docs/*.zip
+
+# ignore coverage
+.coverage
+.coverage.*
+htmlcov/
+
+# Python virtual environments
+.venv/
+**/.venv/
+
+# Lean SDD generated/local state
+.agents/tools/.venv/
+.agents/tools/**/__pycache__/
+.agents/tools/**/*.pyc
+
+# ignore specific directories 
+.idea/
+.vscode/
+.pytest_cache/
+logs/
+models/
+data/
+
+# obsidian workspace
+docs/.obsidian/workspace.json
+
+# build artifacts
+build/
+dist/
+*.egg-info/
+
+# tooling caches
+.ruff_cache/
+.mypy_cache/
+
+# explicit temporary/backup files
+*.bak
+*.old
+*.trashme
+

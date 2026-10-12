@@ -1,0 +1,5 @@
+# Local credentials and transient logs; commit only the configuration example.
+/.env
+/.env.*
+!/.env.example
+*.log
