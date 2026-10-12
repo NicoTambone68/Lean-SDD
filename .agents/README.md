@@ -20,7 +20,7 @@ declared validation tools; the Bash skills have no Python package dependencies.
 Supply an already provisioned GitHub repository and explicitly select its
 owner/repository and existing working/base branch. Both effective origin fetch
 and push URLs must identify that repository. No base defaults to `main`.
-Provisioning, migration, and remote replacement are outside this workflow.
+Provisioning and remote replacement are outside this workflow.
 
 `lean-sdd doctor` performs local diagnostics without loading `.env`, contacting
 GitHub, running project code, or proving readiness. A missing credential is
@@ -129,10 +129,8 @@ and `uv.lock`. Required commands are defined in `AGENTS.md`: pytest, Ruff lintin
 and formatting, and mypy through `uv run`. The installer does not create an
 application scaffold or execute those commands in the target project.
 
-Live acceptance remains separate from installer tests and local diagnostics.
-See [readiness and acceptance](github-workflow-acceptance.md). Historical server
-observations in the reference contracts do not prove current capabilities or
-permissions. Use current observations for each deployment.
+Verify current server capabilities and repository permissions before live use.
+Installer tests and local diagnostics do not establish those permissions.
 
 Operational references:
 

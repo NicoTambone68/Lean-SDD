@@ -12,8 +12,8 @@ uv loads `GITHUB_MCP_URL` and `GITHUB_TOKEN` from the untracked environment file
 preserving values already exported. Bind explicit arguments before invoking uv;
 do not source `.env` or returned data as arbitrary code. See
 [environment setup](README.md#environment-and-capability-verification).
-A's transport owns MCP sessions, requests, timeouts, and cleanup; B uses owning
-shell calls with output redirected to private temporary files.
+The shared transport owns MCP sessions, requests, timeouts, and cleanup. Issue
+scripts use owning-shell calls with output redirected to private temporary files.
 
 | Operation | Invocation after the uv/Bash prefix above | Success contract |
 | --- | --- | --- |
@@ -35,7 +35,7 @@ checked case-insensitively against the explicitly selected repository.
 `lib/github-identity.sh` contains lexical identity and canonical Git remote
 validation. `lib/github-issues.sh` contains the narrow shared MCP domain decoder
 and issue identity checks. Structured content must match the expected type
-(object by default; C explicitly requests arrays for PR/review lists).
+(object by default; pull-request helpers request arrays for PR/review lists).
 Accompanying text, if present, must decode to that same value. Otherwise require
 exactly one text JSON value of that type. Ambiguous representations are errors.
 
@@ -59,53 +59,7 @@ creates the branch at the fetched commit. Failures preserve and report actual
 state, including when switching or fetching already happened. Git transport
 errors are summarized because raw errors can expose credential-bearing URLs.
 
-## Historical evidence and tests
-
-This section records original-port observations and tests. It is not evidence
-that this installed project has been validated; referenced fixtures are not
-bundled with the installer.
-
-Read-only MCP verification on **2026-09-13 at 14:29 UTC** used the configured
-official GitHub endpoint and A's transport. Successful calls were initialization,
-`get_me`, `search_repositories` (`repo:github/github-mcp-server`, page 1, 100,
-minimal output disabled), discovery of a public issue using `search_issues`, and
-`issue_read/get` on `github/github-mcp-server#1`. No GitHub writes were performed.
-
-Observed search fields: numeric `total_count`, boolean `incomplete_results`,
-array `items`; each full repository included `owner.login`, `name`, `full_name`,
-`html_url`, `visibility`, `private`, and `archived`. Observed issue fields:
-`number`, `html_url`, `title`, `body`, `state`, and `updated_at`. The issue read did
-not return `id` or `url`; these must not be fabricated or substituted for
-`number`/`html_url`. The retained test fixture projects only those consumed
-public fields; other account details, tokens, and session IDs are excluded.
-
-Write-response fixtures are **source-informed and offline tested**, not live
-write verification. GitHub's official
-[issues.go](https://github.com/github/github-mcp-server/blob/main/pkg/github/issues.go)
-implements create/update/comment responses using `MinimalResponse`: string `id`
-and `url`. Issue URLs identify `/issues/<number>`; comment URLs include
-`#issuecomment-<id>`. B validates these returned identities, then reads the exact
-created/closed issue. That source is the upstream main branch, not proof of the
-remote server's deployed revision. D must verify real write responses and
-repository-specific access in an explicitly authorized disposable repository.
-Unsupported or ambiguous write responses fail without retrying a mutation.
-
-Tests run the real Bash entry points with A's curl/MCP boundary. They verify
-literal multiline payloads, identity/entity rejection, empty versus absent body,
-malformed/denied/timeout results, no duplicate create/comment/close, closure
-readback, complete/partial/repeated search pages, and the 1,000-result boundary.
-Git tests execute against disposable bare remotes. A test-only wrapper supplies
-GitHub URLs for repository-validation reads; actual fetch/switch/fast-forward/
-branch operations still use real Git. Production has no local-remote bypass.
-The matrix covers main and non-main bases, remote advances, invalid/missing
-inputs, dirty/detached/existing-branch states, wrong fetch/push destinations,
-rewritten URLs, divergence/local-ahead, and operation failures.
-
-Validation commands: `uv run pytest`, `uv run ruff check .`,
-`uv run ruff format --check .`, `uv run mypy .`, and `bash -n` for changed/new
-Bash files. Production loads no Python tests or fixtures.
-
-## C/D handoff and workflow gates
+## Workflow gates
 
 - After creation, stop for implementation approval; read the current issue anew
   and recheck the constitution before branch preparation. Preserve the full
@@ -114,15 +68,16 @@ Bash files. Production loads no Python tests or fixtures.
   finalization, and failure checkpoints, populated only with actual facts.
 - Implementation checkpoint success precedes separate publication approval.
   Successful publication and PR checkpoint precede separate merge approval.
-  C must retain actual publication values, including the full implementation
+  Retain actual publication values, including the full implementation
   source SHA and explicit working branch, across the merge gate. The branch
   preparation SOURCE_COMMIT is only its starting commit.
-- C must use the schema-verified `expectedHeadSha` for the approved merge and
-  verify the remote merge and local synchronization before finalization.
+- The merge script must use the schema-verified `expectedHeadSha` for the
+  approved merge and verify the remote merge and local synchronization before
+  finalization.
 - Use non-closing `owner/repo#number` references in commits/PR descriptions.
-  Closure remains a separate B operation, invoked only after the finalization
-  comment succeeds. A confirmed update alone is insufficient; targeted readback
-  must confirm the same issue closed.
+  Closure remains a separate `update-issue` operation, invoked only after
+  the finalization comment succeeds. A confirmed update alone is insufficient;
+  targeted readback must confirm the same issue closed.
 - A failed comment stops without recursive audit. Unconfirmed closure stops
   without assuming open/closed or adding a failure comment. Unknown create/write
   outcomes must be reconciled, never automatically retried.

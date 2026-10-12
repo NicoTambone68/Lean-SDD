@@ -23,7 +23,7 @@ and inconsistent owner/repo/issue/branch mappings fail before mutation.
 Publication success is precisely the retained merge input. Keep its JSON file
 unchanged across the checkpoint and approval gate. Preparing a new tuple from a
 later HEAD or PR response would replace approved state and is forbidden.
-`SOURCE_COMMIT` returned by B's branch preparation was its starting commit;
+`SOURCE_COMMIT` returned by branch preparation was its starting commit;
 the publication input instead uses the actual validated implementation commit.
 
 Merge success adds these factual fields to the retained tuple:
@@ -74,8 +74,8 @@ state with a fresh observation.
 2. Require clean index/worktree (including untracked files), attached expected
    branch/HEAD, writable Git metadata, existing local working branch, canonical
    issue reference in the commit, and both effective origin destinations matching
-   the repository. Reuse B's canonical SSH/HTTPS identity rules; no aliases or
-   local-path bypass in production.
+   the repository. Reuse the shared canonical SSH/HTTPS identity rules; no
+   aliases or local-path bypass in production.
 3. Initialize MCP, discover all tool schemas, validate phase capabilities, and
    successfully read `get_me`. Git credentials are separate.
 4. Enumerate open PRs with explicit repository/head/base filters, 100 per page.
@@ -87,7 +87,8 @@ state with a fresh observation.
 6. Create with explicit repository/head/base/title/body. Validate the returned
    ID/URL, then read that PR and require its repository/head/base/SHA and open,
    non-draft, unmerged state to match. Recheck local state and emit the tuple.
-7. Orchestration records B's PR checkpoint and waits for separate merge approval.
+7. Orchestration records the pull-request checkpoint and waits for separate
+   merge approval.
 
 Closing-keyword detection is deliberately conservative, including Markdown link
 and formatting variants. Reword flagged text; the script never silently rewrites
@@ -124,9 +125,9 @@ this safeguard does not lock all PR metadata or the base ref atomically.
 Require a positive merge response with a full SHA. Independently read the PR
 again, requiring matched identity, source, destination, `state=closed`,
 `merged=true`, and observed `merged_at`. A closed PR alone is insufficient.
-The deployed MCP minimal PR response omits `merge_commit_sha`; therefore C also
-reads the exact returned SHA through MCP `get_commit` and checks its SHA and
-repository commit URL. If a PR response includes `merge_commit_sha`, it must
+The deployed MCP minimal PR response omits `merge_commit_sha`; therefore the
+merge script also reads the exact returned SHA through MCP `get_commit` and
+checks its SHA and repository commit URL. If a PR response includes `merge_commit_sha`, it must
 agree. No merge SHA is inferred from the current base tip.
 
 Fetch the explicit base into its tracking ref without a force refspec. Before
@@ -138,35 +139,6 @@ branch, cleanliness, equal local/tracking SHAs and merge ancestry. Newer base
 commits are accepted if those conditions hold. Fetch plus explicit `merge
 --ff-only` binds synchronization to the verified fetched ref without another
 network pull or an inferred upstream. Local-ahead or divergent state is not reset.
-
-## Response evidence
-
-Read-only evidence was collected from the configured official GitHub MCP endpoint
-on 2026-09-13, using A's transport. `tests/fixtures/github-pr-schemas.json`
-projects actual names/input schemas for get_me, PR list/create/read/merge and
-get_commit. Public PR reads on `github/github-mcp-server#3254` verified minimal
-head/base objects (`ref`, `sha`, `repo.full_name`), state/draft/merged flags,
-mergeability, combined status, empty check runs, review arrays and commit reads.
-The inspected PR was closed and unmerged; these reads are not merge acceptance.
-An empty merged-PR selection from a list was not treated as merged evidence.
-
-The official upstream [PR implementation](https://github.com/github/github-mcp-server/blob/main/pkg/github/pullrequests.go)
-and [minimal types](https://github.com/github/github-mcp-server/blob/main/pkg/github/minimal_types.go)
-provide source evidence for create `{id,url}`, merge `{merged,sha,message}`, PR
-`merged_at`, statuses, checks and reviews. Upstream main is not proof of the
-remote server's deployed revision. Write responses, source-race rejection and
-resulting remote movement are fixture-tested; live writes remain for D in an
-explicitly authorized disposable repository. No GitHub PR was created or merged
-while implementing C.
-
-Tests execute the real Bash phase scripts, reuse A's curl boundary, and operate
-real local Git repositories against disposable bare remotes. Only effective
-GitHub URL validation reads are substituted; Git operations still execute. The
-MCP fixture explicitly advances the bare remote when delivering a simulated
-server merge response. Constructing that fixture graph never replaces the
-production `merge_pull_request` call. Events verify exact order and arguments,
-not skill wording. Required validation remains pytest, Ruff lint/format, mypy,
-Bash syntax checks and supplementary Bash linting when available.
 
 ## Failure and recovery handoff
 
@@ -181,7 +153,7 @@ Bash syntax checks and supplementary Bash linting when available.
 | Merge rejected/false/malformed/timed out | No second merge, no synchronization/checkpoint/closure; reconcile uncertain remote state explicitly |
 | Merge readback/commit verification fails | Merge may have happened; stop before local synchronization |
 | Remote evidence valid but fetch/ancestry/local synchronization fails | Preserve remote effects and local changes; report incomplete finalization, no reset/rollback/closure |
-| Successful merge/sync result, then finalization comment fails | No issue closure; follow B's comment failure rules |
+| Successful merge/sync result, then finalization comment fails | No issue closure; follow the comment failure rules in `update-issue` |
 
 Diagnostics include stage, push/create/merge state, known PR number, whether PR
 and commit reads verified remote evidence, and actual local branch/HEAD where

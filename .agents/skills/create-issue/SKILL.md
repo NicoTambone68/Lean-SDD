@@ -40,7 +40,7 @@ If the script fails, stop. A timeout, malformed result, sparse result without a
 reliable URL, or failed readback can leave creation unconfirmed. Do not guess an
 issue number, create a branch, or automatically repeat creation. Report known
 identity and uncertainty for reconciliation; a second create can duplicate an
-issue. See [the B contract](../../github-issue-contract.md).
+issue. See [the issue and branch contract](../../github-issue-contract.md).
 
 ## Successful handoff example
 

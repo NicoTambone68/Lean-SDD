@@ -1,39 +1,10 @@
 # GitHub MCP transport contract
 
-## Historical server evidence
+## Required server capabilities
 
-The following observations belong to the original port. Referenced test files
-are not bundled with the installer, and these observations do not establish
-current server capabilities or readiness of an adopting project. Follow
-[setup](README.md) for fresh verification.
-
-Read-only verification: **2026-09-13, 13:36 UTC**.
-
-- Endpoint: `https://api.githubcopilot.com/mcp/` (official GitHub remote MCP).
-- Server name: `github-mcp-server`.
-- Server version: `github-mcp-server/remote-d2d339e31592ae3fd8fe9c5277c6b220f7d7bab9`.
-- Negotiated protocol: `2025-06-18`.
-- Initialize: HTTP 200, `text/event-stream`, session ID present.
-- Initialized notification: HTTP 202, empty body.
-- `tools/list`: HTTP 200, 44 tools, one page, no next cursor. No explicit
-  toolset override was sent; this verifies the endpoint's defaults only.
-- `get_me`: HTTP 200, successful tool result with a text JSON object containing
-  `id`, `login`, `profile_url`, `avatar_url`, and `details`. Personal values,
-  tokens and session identifiers are intentionally excluded from this record.
-
-The sanitized **actual input schemas**, projected to `name` and `inputSchema`
-for the nine required tools, are in
-`tests/fixtures/github-mcp-schemas.json` in the port repository.
-They are evidence and test input, not a production dependency. The server did
-not advertise output schemas for these tools. No domain response field below
-is claimed to be verified solely because an input schema exists.
-
-The implemented Bash transport was checked against the same endpoint at
-**2026-09-13, 14:11 UTC**: initialization, complete tools discovery, capability
-validation and `get_me` all succeeded. The nine projected input schemas matched
-the retained fixture exactly; the server version and 44-tool count were
-unchanged. Request IDs advanced through 1, 2 and 3 (next ID 4). This check
-performed no GitHub domain writes.
+Verify the deployed tool schemas and authenticated identity before live
+operations. Follow [setup](README.md) for verification commands. Input schemas
+alone do not establish response fields or repository permissions.
 
 | Required operation | Advertised tool and input contract |
 | --- | --- |
@@ -55,46 +26,9 @@ advertises `get`, `get_comments`, `get_sub_issues`, `get_parent`, `get_labels`.
 `get_comments`, `get_check_runs`.
 
 `expectedHeadSha` is a string property in the actual merge input schema.
-Although the server marks it optional, **C must require the retained approved
-SOURCE_COMMIT and always send it**. A preceding read cannot replace that
-atomic expected-head safeguard.
-
-Evidence levels are separate:
-
-- **Schema verified:** required tools, method enums, and expected-head input.
-- **Access verified:** authentication and the `get_me` identity read only.
-- **Fixture tested:** transport, capability checks, and existing working-branch
-  behavior in offline pytest tests.
-- **Pending D:** repository-specific write permissions, live response
-  normalization and write behavior, enforcement of `expectedHeadSha`,
-  merge verification, local synchronization, and confirmed closure. No remote
-  test artifacts were created. Missing credentials are a prerequisite failure,
-  not evidence that MCP is infeasible.
-
-## Inventory at the A checkpoint (historical)
-
-Paths in this table are relative to `src/.agents/`. This records the A
-checkpoint, not current B status. B replaced `list-projects` with
-`list-repositories` and ported create/read/comment/close and branch preparation.
-The approved B issue assigns closure to B, superseding the initial C allocation
-below. Current entry points and response evidence are in the B contract.
-
-| Current component | Current responsibility | Handoff |
-| --- | --- | --- |
-| `lib/mcp.sh` | MCP initialization and calls; previously weak response validation and subshell request-ID state | A provides transport and complete MCP results only |
-| `skills/create-issue/scripts/create-issue.sh` | YouTrack arguments and result interpretation; captures `mcp_call` in a subshell | B must port domain mapping and adopt owning-shell calls |
-| `skills/get-issue/scripts/get-issue.sh` | Direct YouTrack issue read | B must use `issue_read` and validate identity/full specification |
-| `skills/list-projects/scripts/list-projects.sh` | YouTrack project listing | B must replace with explicit GitHub repository discovery/selection |
-| `skills/update-issue/scripts/comment-issue.sh` | YouTrack audit comments | B must normalize returned comment identity |
-| `skills/update-issue/scripts/close-issue.sh` | YouTrack close command and subsequent confirmation | C must map GitHub closure and observed closed state |
-| `skills/git-change-workflow/scripts/prepare-change-branch.sh` | Local Git branch preparation from an explicit working branch | Existing behavior is preserved in replacement tests; B adapts GitHub identity |
-| `skills/finalize-implementation/SKILL.md` | AWS/CodeCommit publication and merge; retains `PR_ID`, `SOURCE_COMMIT`, `BRANCH`, `WORKING_BRANCH` | C ports service operations and keeps literal approval state |
-| `../AGENTS.md`, skill instructions, `README.md` | Orchestration, approvals, instructions and deployment guidance | B/C/D update their assigned sections; A does not rewrite them |
-
-Port C has replaced the publication skill described at this historical
-checkpoint. Global orchestration is integrated; live acceptance remains pending.
-Do not add compatibility fallbacks or promote this intermediate port. The former
-create-issue subshell caller noted at the A checkpoint has been replaced in B.
+Although the server marks it optional, **the merge script must require the
+retained approved SOURCE_COMMIT and always send it**. A preceding read cannot
+replace that atomic expected-head safeguard.
 
 ## Transport interface
 
@@ -173,13 +107,13 @@ an **unconfirmed outcome**: no automatic retry or replay is attempted. The
 error identifies the method/tool and request ID, without arguments or server
 body. The orchestrator must stop and reconcile under its explicit policy.
 
-## Shared domain contracts for B/C
+## Shared domain contracts
 
 These are **required normalized outputs**, not invented GitHub response schemas.
-B/C own the mapping from observed MCP results, including text JSON or structured
-content, and must retain evidence for any newly consumed server fields. Parse
-JSON as data with jq; never source or eval it. No direct API, gh service-client,
-AWS or YouTrack fallback belongs in the resulting workflow.
+The issue and pull-request helpers map observed MCP results, including text
+JSON or structured content, and must retain evidence for any newly consumed
+server fields. Parse JSON as data with jq; never source or eval it. GitHub
+service operations use only the configured official GitHub MCP server.
 
 Identity inputs are explicit `owner`, `repo` and a positive integer
 `issue_number`. Retain the returned issue URL. The human reference is
@@ -207,12 +141,6 @@ write submission is insufficient to claim merge or closure.
 
 ## Validation and deployment prerequisites
 
-`tests/test_mcp_transport.py` and its test-only curl boundary exercise the real
-Bash transport offline. `tests/test_branch_preparation.py` exercises the current
-real Bash Git entry point against temporary bare repositories, including a
-remote advance before synchronization. The old string-based CodeCommit checks
-were removed with the original test module.
-
 Run `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`,
 `uv run mypy .`, and `bash -n` on the two library scripts. Production never
 loads the fixtures or Python test code.
@@ -220,5 +148,5 @@ loads the fixtures or Python test code.
 Remaining deployment prerequisites: explicitly selected GitHub repository,
 appropriate token/policy access to that repository, separately working Git
 SSH/HTTPS credentials, the applicable approvals and
-live acceptance evidence. No repository provisioning, history migration,
-remote replacement, production-agent edits, or promotion is included in A.
+verification of live operations. Repository provisioning and remote replacement
+are outside this workflow.

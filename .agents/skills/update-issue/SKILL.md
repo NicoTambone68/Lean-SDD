@@ -136,7 +136,8 @@ time of that read. A denied, missing, malformed, timed-out, or mismatched respon
 leaves closure unconfirmed. In either case stop: do not blindly repeat the update,
 assume the current state, or add a failure audit claiming the issue remains open.
 The script does not infer whether orchestration prerequisites were completed;
-the caller must enforce them. See [the B contract](../../github-issue-contract.md).
+the caller must enforce them. See
+[the issue and branch contract](../../github-issue-contract.md).
 
 ## Successful handoff example
 

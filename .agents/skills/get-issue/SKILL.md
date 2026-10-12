@@ -18,8 +18,8 @@ uv run --no-project --env-file .agents/.env -- \
 
 uv supplies `GITHUB_MCP_URL` and `GITHUB_TOKEN` from `.agents/.env` or the
 existing environment. The script calls
-`issue_read` with `method=get` through A's HTTP MCP transport. It validates the
-returned number, GitHub issue URL, entity type, title, complete body, and state.
+`issue_read` with `method=get` through the shared HTTP MCP transport. It validates
+the returned number, GitHub issue URL, entity type, title, complete body, and state.
 It rejects pull requests, identity mismatches, missing/null body, inaccessible
 issues, malformed responses, and transport failures.
 
@@ -32,7 +32,7 @@ After implementation approval, perform a fresh read and use it as the complete
 authoritative specification. Revalidate the constitution. If the fresh body does
 not specify enough work to implement safely, clarify the missing requirement;
 do not substitute a remembered plan. A nonzero exit blocks dependent operations.
-See [the B contract](../../github-issue-contract.md).
+See [the issue and branch contract](../../github-issue-contract.md).
 
 ## Successful handoff example
 

@@ -5,8 +5,8 @@ description: Publish an approved GitHub issue implementation or merge its separa
 
 Use the two Bash entry points for new GitHub projects. Read
 [phase contracts and recovery boundaries](references/phase-contracts.md) before
-invoking either phase. The integrated orchestration is in `AGENTS.md`;
-authorized live acceptance remains pending. See [readiness](../../github-workflow-acceptance.md).
+invoking either phase. The orchestration is in `AGENTS.md`; see
+[setup](../../README.md) for environment and capability verification.
 
 The caller supplies explicit owner/repository/issue identity and the working
 branch retained from branch preparation. `BRANCH` must be `gh-<issue-number>`.
@@ -52,7 +52,7 @@ or silently resume publication. MCP identity access does not prove write access.
 Only exit 0 returns the retained publication tuple: `owner`, `repo`,
 `issue_number`, `issue_url`, `issue_reference`, `PR_ID`, `PR_URL`, `SOURCE_COMMIT`,
 `BRANCH`, and `WORKING_BRANCH`. Preserve these exact values and the entire JSON
-file. Record B's pull-request checkpoint using this output. If that checkpoint
+file. Record the pull-request checkpoint using this output. If that checkpoint
 fails, keep the PR identity and stop; do not republish or merge.
 
 After the checkpoint succeeds, report the PR and STOP for separate explicit
@@ -89,7 +89,7 @@ base commit is allowed when it contains the verified merge.
 
 Only exit 0 emits the retained tuple plus `merged`, `merge_commit`,
 `local_branch`, `local_commit`, `remote_commit`, `synchronized`, and `clean`.
-Record B's finalization checkpoint only from this successful output. Invoke B's
+Record the finalization checkpoint only from this successful output. Invoke the
 separate issue closure only after that checkpoint succeeds. Neither phase
 records checkpoints, closes issues, or decides whether a human approved it.
 
@@ -103,8 +103,8 @@ A create or merge timeout/malformed response can leave a real remote operation
 unconfirmed. Never automatically repeat it or fabricate a success checkpoint.
 If remote merge verification succeeded but local synchronization fails, preserve
 the remote merge and local state, report incomplete finalization, and leave
-closure blocked. Use B's failure checkpoint rules; never recursively audit a
-failed comment. Recovery requires a separate explicit decision as documented in
+closure blocked. Use the failure checkpoint rules in `update-issue`; never
+recursively audit a failed comment. Recovery requires a separate explicit decision as documented in
 the reference; these normal entry points do not implement a recovery mode.
 
 ## Successful handoff example
