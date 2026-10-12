@@ -6,12 +6,18 @@ description: Retrieve and validate the full current GitHub issue specification f
 Require the expected `OWNER`, `REPO`, and positive `ISSUE_NUMBER` from the retained
 issue identity. Do not infer these from the current branch or a database ID.
 
+Run from the project root using uv to load `.agents/.env` as described in
+[environment setup](../../README.md#environment-and-capability-verification).
+Bind explicit arguments in the calling shell before invoking uv.
+
 ```bash
-bash .agents/skills/get-issue/scripts/get-issue.sh \
-    "$OWNER" "$REPO" "$ISSUE_NUMBER"
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/get-issue/scripts/get-issue.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER"
 ```
 
-Provide `GITHUB_MCP_URL` and `GITHUB_TOKEN` in the environment. The script calls
+uv supplies `GITHUB_MCP_URL` and `GITHUB_TOKEN` from `.agents/.env` or the
+existing environment. The script calls
 `issue_read` with `method=get` through A's HTTP MCP transport. It validates the
 returned number, GitHub issue URL, entity type, title, complete body, and state.
 It rejects pull requests, identity mismatches, missing/null body, inaccessible
@@ -37,8 +43,9 @@ file in the private `EVIDENCE_DIR`, then read the revised specification:
 OWNER=$(jq -er .owner "$EVIDENCE_DIR/issue.json")
 REPO=$(jq -er .repo "$EVIDENCE_DIR/issue.json")
 ISSUE_NUMBER=$(jq -er .issue_number "$EVIDENCE_DIR/issue.json")
-bash .agents/skills/get-issue/scripts/get-issue.sh \
-    "$OWNER" "$REPO" "$ISSUE_NUMBER" > "$EVIDENCE_DIR/current-issue.json" || exit 1
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/get-issue/scripts/get-issue.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER" > "$EVIDENCE_DIR/current-issue.json" || exit 1
 jq '{issue_reference,title,body}' "$EVIDENCE_DIR/current-issue.json"
 ```
 

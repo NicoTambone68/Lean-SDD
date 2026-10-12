@@ -58,8 +58,9 @@ jq -n --arg owner "$OWNER" --arg repo "$REPO" \
     '{owner:$owner,repo:$repo,issue_number:$issue_number,issue_url:$issue_url,
       BRANCH:$BRANCH,WORKING_BRANCH:$WORKING_BRANCH,SOURCE_COMMIT:$SOURCE_COMMIT,
       title:$title,body:$body}' > "$PUBLICATION_INPUT" || exit 1
-bash .agents/skills/finalize-implementation/scripts/publish-implementation.sh \
-    "$PUBLICATION_INPUT" > "$RETAINED_STATE" || exit 1
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/finalize-implementation/scripts/publish-implementation.sh \
+        "$PUBLICATION_INPUT" > "$RETAINED_STATE" || exit 1
 ```
 
 Record the PR checkpoint from this successful output and stop for separate merge

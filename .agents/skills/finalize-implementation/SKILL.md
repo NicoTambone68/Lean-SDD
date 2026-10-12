@@ -11,13 +11,18 @@ authorized live acceptance remains pending. See [readiness](../../github-workflo
 The caller supplies explicit owner/repository/issue identity and the working
 branch retained from branch preparation. `BRANCH` must be `gh-<issue-number>`.
 Never infer the issue from HEAD, default the base to `main`, or replace retained
-values after an approval pause. Require `GITHUB_MCP_URL` and `GITHUB_TOKEN` in the
-environment plus separate working Git authentication. Do not expose credentials.
+values after an approval pause. Supply `GITHUB_MCP_URL` and `GITHUB_TOKEN`
+through `.agents/.env` or the existing environment, with separate working Git
+authentication. Do not expose credentials.
 
 Keep JSON input/output files in a protected location outside the Git worktree so
 they survive approval pauses without making the implementation dirty. Use
 `umask 077`; parse values with jq, never source/eval returned JSON. All inputs
 must be actual values, not examples or placeholders.
+
+Run from the project root using uv to load `.agents/.env` as described in
+[environment setup](../../README.md#environment-and-capability-verification).
+Bind explicit arguments in the calling shell before invoking uv.
 
 ## Publication invocation
 
@@ -25,8 +30,9 @@ Only after implementation, required validation, commit, implementation checkpoin
 AND explicit publication approval:
 
 ```bash
-bash .agents/skills/finalize-implementation/scripts/publish-implementation.sh \
-    "$PUBLICATION_INPUT" > "$RETAINED_STATE"
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/finalize-implementation/scripts/publish-implementation.sh \
+        "$PUBLICATION_INPUT" > "$RETAINED_STATE"
 ```
 
 The input file contains exactly `owner`, `repo`, `issue_number`, `issue_url`,
@@ -58,8 +64,9 @@ Only after the pull-request checkpoint succeeds AND separate explicit approval
 to merge the retained source commit:
 
 ```bash
-bash .agents/skills/finalize-implementation/scripts/merge-implementation.sh \
-    "$RETAINED_STATE" > "$FINALIZATION_RESULT"
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/finalize-implementation/scripts/merge-implementation.sh \
+        "$RETAINED_STATE" > "$FINALIZATION_RESULT"
 ```
 
 Pass the exact successful publication file, not a record rebuilt from current

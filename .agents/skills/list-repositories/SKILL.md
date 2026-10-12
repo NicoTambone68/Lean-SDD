@@ -7,12 +7,18 @@ Use this skill when the user needs to identify a repository for a new GitHub
 workflow. Require an explicit meaningful query, for example `user:octocat`,
 `org:example`, or `repo:octocat/example`; never silently choose a repository.
 
+Run from the project root using uv to load `.agents/.env` as described in
+[environment setup](../../README.md#environment-and-capability-verification).
+Bind explicit arguments in the calling shell before invoking uv.
+
 ```bash
-bash .agents/skills/list-repositories/scripts/list-repositories.sh "$QUERY"
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/list-repositories/scripts/list-repositories.sh "$QUERY"
 ```
 
-Load `GITHUB_MCP_URL` and `GITHUB_TOKEN` as environment variables without printing
-the token. The script uses A's HTTP MCP transport and `get_me` followed by
+uv loads `GITHUB_MCP_URL` and `GITHUB_TOKEN` from `.agents/.env` while preserving
+existing environment values. Never print the token. The script uses A's HTTP MCP
+transport and `get_me` followed by
 `search_repositories`; no CLI or direct API fallback is provided.
 
 Exit 0 emits JSON containing `query`, `repositories`, `total_count`, `pages`,
@@ -39,8 +45,9 @@ For the user's actual owner scope, with a private `EVIDENCE_DIR`:
 
 ```bash
 QUERY="user:$OWNER"
-bash .agents/skills/list-repositories/scripts/list-repositories.sh \
-    "$QUERY" > "$EVIDENCE_DIR/repositories.json" || exit 1
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/list-repositories/scripts/list-repositories.sh \
+        "$QUERY" > "$EVIDENCE_DIR/repositories.json" || exit 1
 jq '{repositories,incomplete_results,incomplete_reasons}' "$EVIDENCE_DIR/repositories.json"
 ```
 

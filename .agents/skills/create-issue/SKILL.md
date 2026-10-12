@@ -8,13 +8,19 @@ meaningful title and full Markdown plan, including relevant components, approach
 technical considerations, validation, and Constitution Check. Do not omit or
 summarize the body when passing it to the script.
 
+Run from the project root using uv to load `.agents/.env` as described in
+[environment setup](../../README.md#environment-and-capability-verification).
+Bind explicit arguments in the calling shell before invoking uv.
+
 ```bash
-bash .agents/skills/create-issue/scripts/create-issue.sh \
-    "$OWNER" "$REPO" "$TITLE" "$BODY"
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/create-issue/scripts/create-issue.sh \
+        "$OWNER" "$REPO" "$TITLE" "$BODY"
 ```
 
-Provide `GITHUB_MCP_URL` and `GITHUB_TOKEN` in the environment without exposing the
-token. Arguments are data; never use `eval`, source returned JSON, or interpolate
+Provide `GITHUB_MCP_URL` and `GITHUB_TOKEN` through `.agents/.env` or the
+existing environment; uv passes them to the script without printing the token.
+Arguments are data; never use `eval`, source returned JSON, or interpolate
 untrusted text as shell code. The script binds arguments with jq, calls
 `issue_write` with `method=create`, validates the returned issue URL/database ID,
 and reads the newly identified issue using `issue_read` with `method=get`.
@@ -42,8 +48,9 @@ With actual explicitly selected `OWNER`/`REPO`, full reviewed `TITLE`/`BODY`,
 and a private `EVIDENCE_DIR` outside the worktree:
 
 ```bash
-bash .agents/skills/create-issue/scripts/create-issue.sh \
-    "$OWNER" "$REPO" "$TITLE" "$BODY" > "$EVIDENCE_DIR/issue.json" || exit 1
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/create-issue/scripts/create-issue.sh \
+        "$OWNER" "$REPO" "$TITLE" "$BODY" > "$EVIDENCE_DIR/issue.json" || exit 1
 jq '{issue_reference,issue_url,issue_number,BRANCH}' "$EVIDENCE_DIR/issue.json"
 ```
 

@@ -4,13 +4,18 @@
 
 Paths below are relative to the adopting project root. Every
 entry point is Bash, exits nonzero on failure with concise stderr, and emits one
-JSON object on stdout only for success. Require Bash, jq, and curl for MCP; Git
-and jq for branch preparation. Set `GITHUB_MCP_URL` and `GITHUB_TOKEN` as protected
-environment values. Do not source `.env` or returned data as arbitrary code.
+JSON object on stdout only for success. Require uv for environment loading,
+Bash, jq, and curl for MCP, and Git for branch preparation. From the project root,
+prefix each entry point below with
+`uv run --no-project --env-file .agents/.env -- bash .agents/skills/`.
+uv loads `GITHUB_MCP_URL` and `GITHUB_TOKEN` from the untracked environment file,
+preserving values already exported. Bind explicit arguments before invoking uv;
+do not source `.env` or returned data as arbitrary code. See
+[environment setup](README.md#environment-and-capability-verification).
 A's transport owns MCP sessions, requests, timeouts, and cleanup; B uses owning
 shell calls with output redirected to private temporary files.
 
-| Operation | Invocation after `bash .agents/skills/` | Success contract |
+| Operation | Invocation after the uv/Bash prefix above | Success contract |
 | --- | --- | --- |
 | Discovery | `list-repositories/scripts/list-repositories.sh "$QUERY"` | query, normalized repositories, total_count, pages, incomplete_results/reasons |
 | Create | `create-issue/scripts/create-issue.sh "$OWNER" "$REPO" "$TITLE" "$BODY"` | full normalized issue and returned database issue_id |

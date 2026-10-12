@@ -104,16 +104,23 @@ nonzero status on failure. Capture their stdout with redirection; do not put
 public calls in command substitutions, pipelines, or background subshells.
 The library checks the owning Bash process and rejects that misuse.
 
+Bind `output_dir` to an existing private directory in the calling shell, then
+load configuration into the Bash process that will own the MCP session:
+
 ```bash
+uv run --no-project --env-file .agents/.env -- \
+    bash -s -- "$output_dir" <<'BASH'
+set -euo pipefail
+output_dir=$1
 source .agents/lib/mcp.sh
 source .agents/lib/github-mcp.sh
-# Caller selects a private output directory and owns its cleanup.
 umask 077
-mcp_connect "$GITHUB_MCP_URL" "$GITHUB_TOKEN" > "$output_dir/initialize.json" || exit 1
-mcp_list_tools > "$output_dir/tools.json" || exit 1
-github_mcp_check_capabilities "$output_dir/tools.json" || exit 1
-mcp_call get_me '{}' > "$output_dir/identity.json" || exit 1
+mcp_connect "$GITHUB_MCP_URL" "$GITHUB_TOKEN" > "$output_dir/initialize.json"
+mcp_list_tools > "$output_dir/tools.json"
+github_mcp_check_capabilities "$output_dir/tools.json"
+mcp_call get_me '{}' > "$output_dir/identity.json"
 # Reading completed output with $(jq ...) is safe: it changes no session state.
+BASH
 ```
 
 - `mcp_connect <endpoint> <token>` resets connection state, initializes, verifies

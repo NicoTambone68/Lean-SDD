@@ -8,9 +8,14 @@ Constitution Check. Require the retained `OWNER`, `REPO`, and `ISSUE_NUMBER` plu
 the exact `WORKING_BRANCH` explicitly supplied by the user. Never infer a base,
 default to `main`, derive identity from HEAD, or execute placeholder values.
 
+Run from the project root using uv to load `.agents/.env` as described in
+[environment setup](../../README.md#environment-and-capability-verification).
+Bind explicit arguments in the calling shell before invoking uv.
+
 ```bash
-bash .agents/skills/git-change-workflow/scripts/prepare-change-branch.sh \
-    "$OWNER" "$REPO" "$ISSUE_NUMBER" "$WORKING_BRANCH"
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/git-change-workflow/scripts/prepare-change-branch.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER" "$WORKING_BRANCH"
 ```
 
 The script validates inputs, attached HEAD, writable Git metadata, a clean
@@ -47,9 +52,10 @@ With retained actual issue identity, the explicitly selected `WORKING_BRANCH`
 and a private `EVIDENCE_DIR` outside the worktree:
 
 ```bash
-bash .agents/skills/git-change-workflow/scripts/prepare-change-branch.sh \
-    "$OWNER" "$REPO" "$ISSUE_NUMBER" "$WORKING_BRANCH" \
-    > "$EVIDENCE_DIR/branch.json" || exit 1
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/git-change-workflow/scripts/prepare-change-branch.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER" "$WORKING_BRANCH" \
+        > "$EVIDENCE_DIR/branch.json" || exit 1
 jq '{issue_reference,BRANCH,WORKING_BRANCH,SOURCE_COMMIT}' "$EVIDENCE_DIR/branch.json"
 ```
 

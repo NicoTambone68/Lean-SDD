@@ -5,12 +5,17 @@ description: Record GitHub workflow audit checkpoints through MCP and separately
 
 Use these scripts for all issue audit comments and closure. Require the retained
 `OWNER`, `REPO`, and positive `ISSUE_NUMBER`; supply `GITHUB_MCP_URL` and
-`GITHUB_TOKEN` in the environment. Never print credentials or evaluate returned
-JSON as shell code.
+`GITHUB_TOKEN` through `.agents/.env` or the existing environment. Never print
+credentials or evaluate returned JSON as shell code.
+
+Run from the project root using uv to load `.agents/.env` as described in
+[environment setup](../../README.md#environment-and-capability-verification).
+Bind explicit arguments in the calling shell before invoking uv.
 
 ```bash
-bash .agents/skills/update-issue/scripts/comment-issue.sh \
-    "$OWNER" "$REPO" "$ISSUE_NUMBER" "$COMMENT"
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/update-issue/scripts/comment-issue.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER" "$COMMENT"
 ```
 
 The script validates the issue with `issue_read/get`, then calls
@@ -116,8 +121,9 @@ Only after successful merge, synchronization, final checks AND finalization
 comment, invoke:
 
 ```bash
-bash .agents/skills/update-issue/scripts/close-issue.sh \
-    "$OWNER" "$REPO" "$ISSUE_NUMBER"
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/update-issue/scripts/close-issue.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER"
 ```
 
 The script validates the target, calls `issue_write` with `method=update`,
@@ -139,9 +145,10 @@ checkpoint text above using only observed facts, then pass it literally:
 
 ```bash
 COMMENT=$(cat "$EVIDENCE_DIR/checkpoint.txt")
-bash .agents/skills/update-issue/scripts/comment-issue.sh \
-    "$OWNER" "$REPO" "$ISSUE_NUMBER" "$COMMENT" \
-    > "$EVIDENCE_DIR/comment-result.json" || exit 1
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/update-issue/scripts/comment-issue.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER" "$COMMENT" \
+        > "$EVIDENCE_DIR/comment-result.json" || exit 1
 jq '{owner,repo,issue_number,comment_id,comment_url}' "$EVIDENCE_DIR/comment-result.json"
 ```
 

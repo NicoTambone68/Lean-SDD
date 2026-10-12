@@ -29,7 +29,7 @@ coding agents capable of honoring those instructions and invoking the tools.
 
 It also aims to be **as system agnostic as practical**. Skills use Bash scripts
 and common command-line tools rather than a model-specific runtime. Portability
-still requires a compatible Bash environment, Git, curl, and jq; the current
+still requires uv, a compatible Bash environment, Git, curl, and jq; the current
 service integration targets GitHub MCP, and the supplied engineering rules and
 validation commands target Python projects.
 
@@ -130,9 +130,9 @@ invalid installation record are failures. Exit status is 0 without failures,
 1 for an operational failure, and 2 for invalid command syntax. Warnings and a
 successful local diagnostic do not establish live GitHub readiness.
 
-The workflow scripts require Bash 4 or newer plus Git, curl, jq, awk, grep, and
-mktemp. On Windows, use a compatible environment such as WSL for the complete
-workflow; installing the Python CLI alone does not supply these prerequisites.
+Skill invocations require uv for environment-file loading and Bash 4 or newer
+plus Git, curl, jq, awk, grep, and mktemp. On Windows, use a compatible
+environment such as WSL for the complete workflow; installing the Python CLI alone does not supply these prerequisites.
 
 ## Principles and responsibilities
 
@@ -401,20 +401,42 @@ alternative-provider fallback.
 ## Configuration and authentication
 
 Use [.agents/.env.example](.agents/.env.example) as the configuration reference.
-Scripts do **not** automatically load `.env` files; provide reviewed values in
-the calling process's environment.
+Create the untracked `.agents/.env` locally from that example, preserving any
+existing file, and configure credentials privately. The installer supplies the
+example only. All skill invocations load this file through uv from the project
+root:
+
+```bash
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/get-issue/scripts/get-issue.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER"
+```
+
+Bind the actual retained issue identity in the calling shell before running this
+example. uv loads dotenv values for the child process; the Bash scripts do not
+load files themselves. `--no-project` avoids synchronizing the application's
+Python environment. Existing environment values take precedence over `.env`.
+Do not source the file as shell code or print its contents. Use the prefix for
+each skill invocation, including when an agent starts a fresh shell.
+
+The explicit environment file must exist, including in new worktrees. If you
+supply credentials externally, retain a local file containing only non-secret
+settings. For local diagnostics with those values loaded, run
+`uv run --no-project --env-file .agents/.env -- lean-sdd doctor .`.
+Plain `lean-sdd doctor` continues to inspect only its inherited environment.
 
 | Setting | Purpose |
 | --- | --- |
 | `GITHUB_MCP_URL` | Official MCP endpoint, configured as `https://api.githubcopilot.com/mcp/`. |
-| `GITHUB_TOKEN` | Credential supplied privately through the environment or a secret manager. |
+| `GITHUB_TOKEN` | Credential supplied privately in the untracked `.agents/.env`, through the environment, or by a secret manager. |
 | `MCP_PROTOCOL_VERSION` | Protocol selection; the bundled template uses `2025-06-18`. |
 | `MCP_TOOLSETS` | Optional toolset selection; an empty value uses endpoint defaults. |
 | `MCP_CONNECT_TIMEOUT`, `MCP_TIMEOUT` | Transport connection and request limits. |
 
 `OWNER`, `REPO`, and `WORKING_BRANCH` are explicit workflow selections passed to
-the appropriate scripts. Environment placeholders do not select a repository
-or base on the user's behalf.
+the appropriate scripts. Bind these and retained issue/PR arguments in the
+calling shell: it expands arguments before uv loads the environment file.
+`.env` configures the command, not repository selection or workflow identity.
 
 MCP authentication and Git authentication are separate. An MCP `get_me` response
 establishes identity access, not issue-write permission, merge permission, or
@@ -509,8 +531,9 @@ The main adaptation is in the project rules and validation environment:
 
 The existing Bash skills and shared libraries handle Git and GitHub MCP
 operations without running the application's Python checks, so changing the
-application language does not normally require rewriting them. Their Bash,
-Git, curl, jq, and GitHub MCP prerequisites still apply. Verify the adapted
+application language does not normally require rewriting them. Their uv, Bash,
+Git, curl, jq, and GitHub MCP prerequisites still apply; uv remains the
+environment-file loader even for non-Python applications. Verify the adapted
 validation commands and complete the acceptance workflow before claiming the
 new configuration is ready.
 

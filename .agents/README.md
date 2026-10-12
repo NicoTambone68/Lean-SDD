@@ -10,11 +10,12 @@ Paths are relative to the adopting project root. Six skills under `skills/`
 provide Bash entry points; shared helpers live in `lib/`. Scripts perform
 individual operations, while the agent owns sequencing and human approval.
 
-The workflow requires Bash 4 or newer, Git, curl, jq, and standard shell tools
+The workflow requires uv, Bash 4 or newer, Git, curl, jq, and standard shell tools
 including awk, grep, and mktemp. On systems shipping older Bash, install a
 compatible version and make it available as `bash`. Git uses separate SSH/HTTPS
-credentials. Python projects require uv and their declared validation tools;
-there is no independent Python environment for the Bash skills.
+credentials. uv loads the local environment file for skill invocations, even
+when the application uses another language. Python projects also supply their
+declared validation tools; the Bash skills have no Python package dependencies.
 
 Supply an already provisioned GitHub repository and explicitly select its
 owner/repository and existing working/base branch. Both effective origin fetch
@@ -28,32 +29,52 @@ configured. Local warnings still need resolution where relevant to live use.
 
 ## Environment and capability verification
 
-Scripts do not auto-load `.env` or connector configuration. Export reviewed
-values in the caller's environment using [.env.example](.env.example) as a
-reference. Supply `GITHUB_TOKEN` privately through a secret manager or an
-interactive non-echoing read. Do not embed it in commands, remote URLs, or logs.
+Prepare an untracked `.agents/.env` from [.env.example](.env.example) without
+overwriting an existing file. Add `GITHUB_TOKEN` privately, or provide it through
+your environment/secret manager. The installer never creates or copies secrets.
+In a new worktree, provision this local file separately; untracked files do not
+arrive with a checkout. Keep it even when all settings are supplied externally,
+because the explicit `--env-file` path must exist.
+
+Invoke every skill from the project root with:
 
 ```bash
-export GITHUB_MCP_URL='https://api.githubcopilot.com/mcp/'
-read -r -s -p 'GitHub MCP token: ' GITHUB_TOKEN
-export GITHUB_TOKEN
-export MCP_PROTOCOL_VERSION='2025-06-18'
-export MCP_TOOLSETS=''
+uv run --no-project --env-file .agents/.env -- \
+    bash .agents/skills/get-issue/scripts/get-issue.sh \
+        "$OWNER" "$REPO" "$ISSUE_NUMBER"
 ```
 
-Pass the actual selected `OWNER`, `REPO`, and `WORKING_BRANCH` explicitly to the
-scripts. Configuration placeholders never replace user selection. Keep result
-JSON in a private, durable directory outside the worktree; use `umask 077` and
-parse JSON with jq, never source or evaluate it.
+This example requires the actual retained issue identity, bound in the calling
+shell. uv loads dotenv data into the child process without executing it as shell
+code. The Bash scripts themselves do not auto-load configuration. `--no-project`
+prevents application project discovery/synchronization for these Bash commands.
+Existing environment variables take precedence over matching `.env` entries;
+remove a stale exported value explicitly if you intend to use the file's value.
+Do not source `.env`, print it, enable shell tracing, or place tokens in arguments.
+
+The calling shell expands `"$OWNER"`, paths, and other arguments **before** uv
+loads `.env`. Keep repository/base selection and retained issue/PR state out of
+that file and bind them explicitly before invocation. Loading secrets for one
+command does not export them into subsequent Codex shell commands; use the
+prefix on every invocation. A uv failure stops dependent work without bypassing
+the loader or retrying a write.
+
+Store result JSON in a private, durable directory outside the worktree; use
+`umask 077` and parse JSON with jq, never source or evaluate it.
 
 Before live operations, verify the deployed complete schemas, both phase
-contracts, and identity through the actual Bash libraries. Set `AGENT_DIR` to
+contracts, and identity through the actual Bash libraries. Bind `AGENT_DIR` to
 this project's absolute `.agents` path and `EVIDENCE_DIR` to an existing private
-directory outside the worktree. The following performs MCP reads only:
+directory outside the worktree in the calling shell. This example performs MCP
+reads only and passes those paths as data into a single uv-managed Bash process:
 
 ```bash
+uv run --no-project --env-file .agents/.env -- \
+    bash -s -- "$AGENT_DIR" "$EVIDENCE_DIR" <<'BASH'
 set -euo pipefail
 umask 077
+AGENT_DIR=$1
+EVIDENCE_DIR=$2
 source "$AGENT_DIR/lib/github-mcp.sh"
 source "$AGENT_DIR/lib/github-pr.sh"
 mcp_connect "$GITHUB_MCP_URL" "$GITHUB_TOKEN" > "$EVIDENCE_DIR/initialize.json"
@@ -64,7 +85,18 @@ c_capabilities "$EVIDENCE_DIR/tools.json"
 c_phase=merge
 c_capabilities "$EVIDENCE_DIR/tools.json"
 mcp_call get_me '{}' > "$EVIDENCE_DIR/identity.json"
+BASH
 ```
+
+To check the loaded configuration locally without printing values or contacting
+GitHub, use the installed CLI through the same loader:
+
+```bash
+uv run --no-project --env-file .agents/.env -- lean-sdd doctor .
+```
+
+Plain `lean-sdd doctor` still inspects only its inherited environment; it does
+not parse `.env` itself. Neither form proves credential validity or permission.
 
 The foundation and phase checks require the actual tools and fields consumed by
 the scripts, including `expectedHeadSha` protection and merge-commit support.

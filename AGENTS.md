@@ -46,6 +46,15 @@ operations use local Git with separate credentials. Verify deployed tool schemas
 and identity as described in setup; identity reads do not prove write access or
 Git push permission. Unsupported tools stop dependent work without fallback.
 
+Invoke every skill's Bash entry point from the project root with the prefix
+`uv run --no-project --env-file .agents/.env -- bash`, as shown in each skill.
+Follow [environment setup](.agents/README.md#environment-and-capability-verification)
+to prepare the untracked `.agents/.env`. uv loads configuration for the child
+process; do not read secret values into the conversation or source the file as
+shell code. Bind selected repository/base and retained issue/PR arguments in the
+calling shell before invoking uv; `.env` does not select those identities.
+A failed uv invocation stops dependent work just like a failed skill script.
+
 Retain `owner`, `repo`, `issue_number`, `issue_url` and `issue_reference` from
 successful issue results. The canonical reference is `owner/repo#number`; the
 branch is `gh-<issue-number>`. The issue database ID, issue number and PR number
