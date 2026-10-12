@@ -78,10 +78,6 @@ Bash skills perform individual operations. All GitHub service operations use
 the configured official GitHub MCP server; local Git handles branches, commits,
 fetching, pushing, and synchronization with separate Git credentials.
 
-**Readiness:** the bundled acceptance record reports an offline candidate with
-live end-to-end acceptance still pending. The presence of the scripts does not
-establish production readiness. See [acceptance evidence](.agents/github-workflow-acceptance.md).
-
 ## Install the CLI
 
 The installer requires Python 3.11 or newer and uv. From a checkout of this
@@ -179,7 +175,6 @@ The repository contains the installer and the authoritative workflow files:
     ├── .env.example               # non-secret configuration template
     ├── github-mcp-contract.md
     ├── github-issue-contract.md
-    ├── github-workflow-acceptance.md
     ├── lib/                      # shared Bash MCP and GitHub helpers
     └── skills/
         ├── list-repositories/
@@ -199,9 +194,8 @@ application manages its own Python environment separately.
 An adopting Python project additionally supplies its application code under
 `src/`, tests, `pyproject.toml`, and dependency lockfile. Those application and
 test artifacts are not generated in the target by the installer. The tests in
-this repository exercise the installer itself. Historical contract evidence
-remains explicitly labeled; installed projects receive a fresh readiness
-checklist instead of this repository's historical acceptance record.
+this repository exercise the installer itself. Installed projects receive a
+readiness checklist for verifying their own setup.
 
 ## Python project management with uv
 
@@ -232,11 +226,12 @@ for the supplied Python validation workflow.
 
 **Code created or modified by the agent is never merged automatically.** After
 publication approval, the agent creates a pull request for human review. The
-pull request must receive explicit human approval to merge the reviewed source
-revision; passing tests or approval to publish does not authorize a merge. A
-rejected pull request is discarded by closing it without merging, on explicit
-human instruction. While a review decision is pending, the pull request remains
-unmerged; silence is not approval.
+user must explicitly instruct the agent to merge the retained source revision.
+This instruction satisfies the workflow's merge approval gate. GitHub review
+requirements are enforced separately under repository policy; a GitHub
+"Approve" review alone does not instruct the agent to merge. Passing tests or
+approval to publish also does not authorize a merge. While a review decision is
+pending, the pull request remains unmerged; silence is not approval.
 
 The normal lifecycle has **three separate human approval gates**:
 
@@ -347,10 +342,16 @@ The whole result must survive the approval pause unchanged. After the PR
 checkpoint succeeds, the agent reports the PR URL, source, base, and approved
 commit, then stops for separate merge approval.
 
-If the reviewer rejects the change, the merge phase does not run. Discarding the
-PR is a separate, explicitly instructed action rather than successful
-finalization; it does not automatically delete the branch or close the related
-issue as completed.
+If the reviewer requests revisions, keep the PR open and stop the merge path
+for an explicit recovery decision. The normal scripts do not implement a
+revision and resubmission workflow. A revised source commit requires renewed
+validation and approval of that source before publication or merge; never
+overwrite retained approval state or rerun publication against an existing PR
+to bypass recovery.
+
+If the user instead decides to abandon the change, close the PR without merging
+only on an explicit instruction. Closing it does not complete the workflow,
+automatically delete the branch, or close the related issue as completed.
 
 ### 5. Merge the approved source and synchronize
 
@@ -359,8 +360,14 @@ local and remote identities, PR state, checks, reviews, and mergeability.
 The merge request uses the retained `SOURCE_COMMIT` as `expectedHeadSha` and
 `merge_method=merge`. The current implementation has no squash or rebase
 fallback. Missing expected-head protection or blocked, pending, or unknown
-required diagnostics stop the operation. GitHub remains authoritative for
-server-side policy; an empty observed check set does not prove policy approval.
+mergeability stops the operation. The script checks all observed commit statuses
+and check runs, including checks that repository policy does not mark required.
+Failed, pending, unknown, or incomplete observations block the merge. Check runs
+must finish with success, neutral, or skipped outcomes; the latest substantive
+review from each reviewer must not request changes. An empty check-run list means
+no check runs were observed; a combined pending status with zero status contexts
+means no commit statuses were observed. GitHub remains authoritative for
+server-side policy; empty observations do not prove policy approval.
 
 After merging, the script independently verifies the PR and merge commit,
 fetches the retained base, checks merge ancestry, and synchronizes the local
@@ -447,8 +454,7 @@ Before live operations, use the read-only procedure in
 [setup and readiness](.agents/README.md#environment-and-capability-verification)
 to verify the deployed tool schemas, authenticated identity, and both publication
 and merge capability contracts. Repeat phase checks after approval pauses as
-specified by the skills. Historical tool observations are not a guarantee of
-current server capabilities.
+specified by the skills.
 
 Local `.agents/.env` files must remain untracked. The supplied `.gitignore`
 ignores `.env` files and preserves `.env.example`; keep equivalent protection
@@ -472,30 +478,41 @@ looks successful. Stop dependent operations and preserve known effects and
 uncertainty. Never guess an identity or automatically repeat uncertain issue,
 comment, PR, merge, or closure writes.
 
-After a known issue exists and before closure begins, record one factual failure
-checkpoint as specified in `AGENTS.md`. If that comment fails, report it and stop
-without another audit attempt. If closure fails or cannot be confirmed, report
-the observed state or uncertainty without claiming the issue is open or closed.
+When a required operation fails after a known issue exists and before closure
+begins, record one factual failure checkpoint as specified in `AGENTS.md`.
+If an audit comment itself fails, report it and stop without another audit
+attempt. If closure fails or cannot be confirmed, report the observed state or
+uncertainty without assuming the issue is open or closed.
 Missing or mismatched approval state requires explicit recovery; new observations
 must not silently replace the approved values.
 
 ## Adopting the workflow
 
-1. Start with an already provisioned GitHub repository and a usable local clone.
+1. Install Python 3.11 or newer, uv, Bash 4 or newer, Git, curl, jq, awk, grep,
+   and mktemp. Install the CLI as described in [Install the CLI](#install-the-cli)
+   and make `lean-sdd` and the required tools available on your PATH.
+2. Start with an already provisioned GitHub repository and a usable local clone.
    Explicitly select its owner, repository, and existing working/base branch.
    Provisioning, remote replacement, and history migration are separate work.
-2. Run `lean-sdd init` to install the governing documents and `.agents/`. Review
+3. Run `lean-sdd init` to install the governing documents and `.agents/`. Review
    existing project rules and reconcile conflicts explicitly; the installer
    refuses to overwrite an existing constitution or other differing files.
-3. Provide application source under `src/`, project tests, dependency metadata,
+4. Provide application source under `src/`, project tests, dependency metadata,
    and the required validation tools. The workflow bundle does not create the
-   application scaffold or its Python environment.
-4. Install Bash, Git, curl, and jq, and configure MCP credentials plus independent
-   Git authentication. Install `uv` and prepare the adopting Python project's
-   environment as described in [Python project management with uv](#python-project-management-with-uv).
-5. Verify the effective origin URLs, selected base, deployed MCP contracts, and
+   application scaffold or its Python environment. Prepare that environment as
+   described in [Python project management with uv](#python-project-management-with-uv).
+5. Configure MCP credentials in the untracked `.agents/.env` and independent
+   Git authentication. Commit the installed workflow files, installation record,
+   and intended project setup through the repository's authorized setup process,
+   keeping credentials untracked. Complete any required publication and review
+   so the selected local base and its origin branch contain the setup and are
+   synchronized before the first issue branch is prepared. Branch preparation
+   requires a clean worktree, including untracked files, and rejects a local
+   base that is ahead of or divergent from origin. The installer does not
+   commit or publish this setup.
+6. Verify the effective origin URLs, selected base, deployed MCP contracts, and
    identity through the documented setup procedure.
-6. Perform an explicitly authorized acceptance run in a disposable project,
+7. Perform an explicitly authorized acceptance run in a disposable project,
    observing all three real approval pauses and separate verified issue closure.
    Record actual results before claiming readiness.
 
@@ -515,19 +532,27 @@ The main adaptation is in the project rules and validation environment:
   principles, and record approved amendments with their rationale and version.
 - **`CODING_STANDARDS.md`:** replace Python idioms, typing, packaging, and tool
   requirements with the target language's conventions and quality standards.
-- **`AGENTS.md`:** update language references and replace the `uv`, pytest, Ruff,
-  and mypy commands with the project's build, test, lint, format, and applicable
-  static-analysis commands. Keep engineering rules in the two rule documents
-  and preserve the issue workflow, approval gates, and failure handling here.
+- **`AGENTS.md`:** update language references and replace the application
+  validation commands (`uv run pytest`, Ruff, and mypy) with the target project's
+  build, test, lint, format, and applicable static-analysis commands. Preserve
+  the `uv run --no-project --env-file .agents/.env -- bash` prefix used to invoke
+  workflow skills. Keep engineering rules in the two rule documents and
+  preserve the issue workflow, approval gates, and failure handling here.
 - **Project configuration:** supply the target ecosystem's dependency manifests,
   lockfiles, build configuration, tests, and any CI checks. Review `.gitignore`
   for language-specific build outputs, caches, and local environment files.
   This bundle does not supply an application scaffold or CI configuration.
 - **Supporting documentation:** update this README and `.agents/README.md` for
   the new setup and validation commands. Review validation references in the
-  MCP, issue, and finalization contract documents linked below. Preserve
-  historical acceptance evidence as historical; record new validation and
-  acceptance results for the adapted project.
+  MCP, issue, and finalization contract documents linked below. Record validation
+  and acceptance results for the adapted project.
+
+`lean-sdd doctor` still checks for Python project metadata and `uv.lock`; editing
+the workflow documents does not change these CLI checks. A non-Python project
+without those files will receive warnings for their absence. Interpret those
+warnings in the context of the chosen language and verify its dependencies and
+toolchain separately. Continue to resolve applicable workflow and credential
+configuration diagnostics; the CLI has no language-selection option.
 
 The existing Bash skills and shared libraries handle Git and GitHub MCP
 operations without running the application's Python checks, so changing the
@@ -574,15 +599,15 @@ Upgrading the CLI does not update previously initialized projects automatically.
 
 ## Validation and further reading
 
-For an adopting Python project, use the validation commands above and additional
-checks required by its specification. For Bash changes, include syntax checks
-and relevant deterministic operational tests.
+For an adopting Python project, run the four checks in
+[Validate, commit, and record implementation](#3-validate-commit-and-record-implementation):
+pytest, Ruff linting, Ruff formatting, and mypy through `uv run`. Add checks
+required by the project's specification. The `uv build` command in the installer
+development section packages Lean-SDD itself; adopting projects need a package
+build only when their own requirements call for one. For Bash changes, include
+syntax checks and relevant deterministic operational tests.
 
-The [acceptance record](.agents/github-workflow-acceptance.md) describes offline
-fixtures from the original port, including simulated MCP responses and local
-Git repositories. Those test files are not present in this bundle, so their
-historical results must not be described as a test run of this checkout.
-Offline checks also cannot prove live permissions, server behavior, or real
+Offline checks cannot prove live permissions, server behavior, or real
 human approval pauses. Live acceptance is side-effecting and requires explicit
 authorization.
 
