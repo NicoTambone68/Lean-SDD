@@ -9,6 +9,8 @@ description = "Install an issue-driven GitHub workflow for coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
+license = "MIT"
+license-files = ["LICENSE"]
 
 [project.scripts]
 lean-sdd = "lean_sdd.cli:main"
@@ -53,6 +55,7 @@ exclude = ["src/lean_sdd/template_overrides"]
 
 [tool.hatch.build.targets.sdist]
 only-include = [
+    "LICENSE",
     "src/lean_sdd",
     "tests",
     "pyproject.toml",
