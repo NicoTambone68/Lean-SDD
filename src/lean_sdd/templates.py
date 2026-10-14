@@ -12,7 +12,7 @@ STATE_PATH = ".agents/lean-sdd-install.json"
 
 def package_version() -> str:
     """Return the version of the installed distribution."""
-    return version("lean-sdd-cli")
+    return version("lean-sdd")
 
 
 def _read_tree(root: Traversable, prefix: str = "") -> dict[str, bytes]:

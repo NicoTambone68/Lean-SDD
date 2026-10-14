@@ -92,7 +92,7 @@ If the executable directory is not on your PATH, run `uv tool update-shell`
 and restart your shell. A built wheel can also be installed with
 `uv tool install /path/to/lean_sdd_cli-0.1.0-py3-none-any.whl`.
 The package has not been published to PyPI; installation by the bare name
-`lean-sdd-cli` is not an advertised installation method yet.
+`lean-sdd` is not an advertised installation method yet.
 
 Initialize a separate target project:
 
@@ -585,7 +585,7 @@ not a recursive copy of local `.agents/` state; update that list when adding a
 workflow asset.
 
 After editing template files, refresh the editable installation's bundled
-resources with `uv sync --reinstall-package lean-sdd-cli` before testing.
+resources with `uv sync --reinstall-package lean-sdd` before testing.
 The tests check conflicts, repeated initialization, symlink rejection, write
 failure cleanup, diagnostics, links, Bash syntax, wheel contents, rebuilding a
 wheel from the source archive, and isolated `uv tool install` execution. Build

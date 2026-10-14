@@ -25,8 +25,8 @@ wheels = [
 ]
 
 [[package]]
-name = "lean-sdd-cli"
-version = "0.1.0"
+name = "lean-sdd"
+version = "0.1.1"
 source = { editable = "." }
 
 [package.dev-dependencies]
