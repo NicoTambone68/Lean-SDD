@@ -1,4 +1,4 @@
-# Lean-SDD — GitHub Agent-Assisted Development
+# Lean-SDD: Agent-Assisted Spec Driven Development on GitHub
 
 Lean-SDD provides an issue-driven development workflow for coding agents working
 on Python projects. It connects a written specification to implementation,
