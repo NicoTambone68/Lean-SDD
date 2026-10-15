@@ -80,19 +80,31 @@ fetching, pushing, and synchronization with separate Git credentials.
 
 ## Install the CLI
 
-The installer requires Python 3.11 or newer and uv. From a checkout of this
-repository, install the CLI into uv's isolated tool environment:
+Lean-SDD is available on [PyPI](https://pypi.org/project/lean-sdd/).
+
+The installer requires Python 3.11 or newer and
+[uv](https://docs.astral.sh/uv/).
+
+Install the latest published release:
 
 ```bash
-uv tool install .
+uv tool install lean-sdd
+```
+
+Verify the installation:
+
+```bash
 lean-sdd --version
 ```
 
-If the executable directory is not on your PATH, run `uv tool update-shell`
-and restart your shell. A built wheel can also be installed with
-`uv tool install /path/to/lean_sdd_cli-0.1.0-py3-none-any.whl`.
-The package has not been published to PyPI; installation by the bare name
-`lean-sdd` is not an advertised installation method yet.
+If the executable directory is not on your PATH, run
+`uv tool update-shell` and restart your shell.
+
+To upgrade an existing installation:
+
+```bash
+uv tool upgrade lean-sdd
+```
 
 Initialize a separate target project:
 
@@ -591,11 +603,22 @@ failure cleanup, diagnostics, links, Bash syntax, wheel contents, rebuilding a
 wheel from the source archive, and isolated `uv tool install` execution. Build
 tests use uv's local cache without network access after development setup.
 
-`uv build` creates a wheel and source archive in `dist/`. This prepares release
-artifacts locally; it does not publish a package. Public release still requires
-selecting an available package name, establishing licensing and PyPI ownership,
-and completing the relevant release review and live workflow acceptance.
-Upgrading the CLI does not update previously initialized projects automatically.
+`uv build` creates a wheel and source archive in `dist/`.
+This prepares release artifacts locally; it does not
+publish the package.
+
+Lean-SDD is distributed through
+[PyPI](https://pypi.org/project/lean-sdd/).
+Publishing is handled through GitHub Actions using
+PyPI Trusted Publishing.
+
+Before publishing a new version, update the package
+version in `pyproject.toml`, complete the required
+tests and release review, and verify the published
+artifacts.
+
+Upgrading the CLI does not automatically update
+workflow files in previously initialized projects.
 
 ## Validation and further reading
 
