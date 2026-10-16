@@ -124,11 +124,35 @@ branch, create issues, scaffold an application, or contact GitHub.
 
 `doctor` checks installed files, local prerequisites, exported MCP configuration,
 and basic Python project metadata. It never loads `.env`, runs project scripts,
-or makes network requests. Modified templates and missing optional setup are
-reported as warnings; missing required tools, missing workflow files, or an
-invalid installation record are failures. Exit status is 0 without failures,
-1 for an operational failure, and 2 for invalid command syntax. Warnings and a
-successful local diagnostic do not establish live GitHub readiness.
+or makes network requests. It validates the installation record independently
+of the current CLI release, then checks each recorded file against its original
+SHA-256 hash. Existing schema-version-1 records need no migration.
+
+- `PASS`: The installed file matches its recorded original content. A record
+  with the current template version and identical manifest also passes.
+- `WARN`: A file differs from its recorded hash (a possible local modification),
+  optional setup is missing, or the installed template version differs from the
+  current CLI version. Identical manifests across versions are compatible and
+  need no upgrade. Different manifests produce an upgrade advisory listing
+  templates added, removed, or changed in the current release.
+- `FAIL`: A record is malformed or uses an unsupported schema, a path is unsafe
+  (including symbolic links), a recorded file is missing or unreadable, or a
+  required tool is missing. A record claiming the current template version but
+  containing a different manifest also fails and identifies the discrepancies.
+
+Updating the CLI does not update a project's installed templates or its record.
+An installation-version warning does not by itself indicate corruption or
+require immediate migration. Files introduced only in the newer release are
+advisories; files recorded by an older release are still checked even if the
+current release no longer includes them. Keep the original record: editing its
+version or hashes would lose the baseline for identifying local modifications.
+Use `doctor` to inspect release differences, and compare a fresh installation
+in a separate directory when reviewing template changes. It never repairs,
+rewrites, upgrades, or downgrades the target.
+
+Exit status is 0 without failures (warnings are allowed), 1 for an operational
+failure, and 2 for invalid command syntax. Warnings and a successful local
+diagnostic do not establish live GitHub readiness.
 
 Skill invocations require uv for environment-file loading and Bash 4 or newer
 plus Git, curl, jq, awk, grep, and mktemp. On Windows, use a compatible

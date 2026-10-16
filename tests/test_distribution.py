@@ -1,5 +1,7 @@
 """Verify actual wheels and source archives, including isolated tool installation."""
 
+import hashlib
+import json
 import os
 import re
 import subprocess
@@ -59,11 +61,17 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     env = os.environ.copy()
     env.pop("PYTHONPATH", None)
     env.pop("VIRTUAL_ENV", None)
+    env.pop("GITHUB_TOKEN", None)
+    env["GITHUB_MCP_URL"] = "https://api.githubcopilot.com/mcp/"
     env["UV_PYTHON_DOWNLOADS"] = "never"
     env["UV_TOOL_DIR"] = str(tmp_path / "tools")
     env["UV_TOOL_BIN_DIR"] = str(tmp_path / "bin")
     output = tmp_path / "dist"
-    run(["uv", "build", "--offline", "--out-dir", str(output)], ROOT, env)
+    run(
+        ["uv", "build", "--no-sources", "--offline", "--out-dir", str(output)],
+        ROOT,
+        env,
+    )
     wheel = next(output.glob("*.whl"))
     archive = next(output.glob("*.tar.gz"))
     payload = template_files()
@@ -128,6 +136,75 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
         timeout=30,
         check=False,
     )
-    assert result.returncode in {0, 1}
+    assert result.returncode == 0, result.stdout + result.stderr
     assert "Local checks only" in result.stdout
+    assert "PASS: Installation record matches current release" in result.stdout
     assert not result.stderr
+
+    # A historical fixture requires no historical release or network access.
+    older = tmp_path / "older project"
+    old_payload = payload.copy()
+    old_payload.pop(".agents/.env.example")
+    old_payload[".agents/README.md"] = b"Historical instructions\n"
+    old_payload[".agents/retired.md"] = b"Retired template\n"
+    for name, content in old_payload.items():
+        path = older / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    (older / STATE_PATH).write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "template_version": "0.0.0",
+                "files": {
+                    name: hashlib.sha256(content).hexdigest()
+                    for name, content in old_payload.items()
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    before = {
+        name: (
+            (older / name).read_bytes(),
+            (older / name).stat().st_mtime_ns,
+            (older / name).stat().st_ctime_ns,
+        )
+        for name in [*old_payload, STATE_PATH]
+    }
+    for _ in range(2):
+        result = run([str(executable), "doctor", str(older)], tmp_path, env)
+        assert (
+            "WARN: Installation was created with another template release"
+            in result.stdout
+        )
+        assert "Recorded template version '0.0.0'" in result.stdout
+        assert f"current CLI version {package_version()!r}" in result.stdout
+        assert (
+            "Templates added in current release: '.agents/.env.example'"
+            in result.stdout
+        )
+        assert (
+            "Templates removed in current release: '.agents/retired.md'"
+            in result.stdout
+        )
+        assert "Template reference hashes changed: '.agents/README.md'" in result.stdout
+        assert "All recorded templates match their original content" in result.stdout
+        assert "Locally modified" not in result.stdout
+        assert not result.stderr
+    assert before == {
+        name: (
+            (older / name).read_bytes(),
+            (older / name).stat().st_mtime_ns,
+            (older / name).stat().st_ctime_ns,
+        )
+        for name in before
+    }
+    assert {
+        path.relative_to(older).as_posix()
+        for path in older.rglob("*")
+        if path.is_file()
+    } == set(before)
+    (older / ".agents/README.md").write_bytes(payload[".agents/README.md"])
+    result = run([str(executable), "doctor", str(older)], tmp_path, env)
+    assert "WARN: Locally modified template: '.agents/README.md'" in result.stdout
