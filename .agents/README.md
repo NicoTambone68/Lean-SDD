@@ -27,6 +27,40 @@ GitHub, running project code, or proving readiness. A missing credential is
 reported as a warning so installation can be inspected before credentials are
 configured. Local warnings still need resolution where relevant to live use.
 
+## Installation diagnostics
+
+`.agents/lean-sdd-install.json` records the original template release and each
+installed file's SHA-256 hash. Commit it with the workflow and preserve it when
+customizing templates. Schema-version-1 records remain supported without manual
+migration. The installed template version can differ from the current CLI
+version: updating the CLI never updates project templates automatically.
+
+Run `lean-sdd doctor /path/to/project` to inspect three separate observations:
+
+- Record validity: malformed JSON, invalid fields or hashes, unsupported schemas,
+  and unsafe paths produce `FAIL`. Symbolic links are rejected.
+- Installed-file integrity: matching the recorded original hash produces `PASS`;
+  a different hash produces `WARN: Locally modified template`. Missing,
+  unreadable, or non-regular recorded files produce `FAIL`.
+- Release compatibility: matching versions and manifests produce `PASS`.
+  Different versions produce `WARN`, including both versions. Identical template
+  contents need no upgrade; changed contents produce an upgrade advisory listing
+  added templates, removed templates, and changed reference hashes. The same
+  version with a contradictory manifest produces `FAIL` with conflicting entries.
+
+New templates absent from an older installation are upgrade advisories, not
+missing-file failures. Templates removed from the current release are still
+validated against their recorded original hashes. A version warning alone does
+not mean corruption or require immediate migration. Review local modifications
+and release differences separately; compare with a fresh installation in another
+directory if needed. Do not edit the record to silence diagnostics.
+
+Diagnostics never rewrite records or templates, repair files, or automatically
+upgrade or downgrade an installation. They do not execute installed scripts or
+load project credentials. Exit status is 0 when there are no failures, including
+when warnings are present; 1 indicates an operational failure and 2 invalid CLI
+syntax. Local diagnostics do not establish GitHub readiness.
+
 ## Environment and capability verification
 
 Prepare an untracked `.agents/.env` from [.env.example](.env.example) without
