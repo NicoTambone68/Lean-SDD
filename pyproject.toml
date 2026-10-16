@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lean-sdd"
-version = "0.1.1"
+version = "0.1.2"
 description = "Install an issue-driven GitHub workflow for coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
