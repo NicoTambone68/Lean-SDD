@@ -185,8 +185,8 @@ def test_fixture_only_bundle_does_not_reference_unselected_python(
     )
     assert PYTHON.standards_path not in bundle.payload
     assert b".agents/standards/python.md" not in bundle.payload["CODING_STANDARDS.md"]
-    # These inert fixtures do not advertise non-Python production support.
-    assert tuple(p.id for p in ProfileRegistry().profiles) == ("python",)
+    # A test-only registry cannot advertise its fixture as production support.
+    assert fixture.id not in {p.id for p in ProfileRegistry().profiles}
 
 
 def test_declared_skill_requires_nonempty_instructions(
@@ -204,7 +204,7 @@ def test_declared_skill_requires_nonempty_instructions(
         )
 
 
-@pytest.mark.parametrize("selected", [[], ["typescript"], ["../python"]])
+@pytest.mark.parametrize("selected", [[], ["unknown"], ["../python"]])
 def test_invalid_or_unsupported_selection(selected: list[str]) -> None:
     with pytest.raises(ValueError):
         resolve_bundle(selected)

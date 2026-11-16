@@ -201,7 +201,7 @@ def test_incomplete_configuration_is_an_error(text: str) -> None:
         ('profiles = ["python"]', 'profiles = "python"'),
         ('profiles = ["python"]', "profiles = [true]"),
         ('profiles = ["python"]', 'profiles = ["python", "python"]'),
-        ('profiles = ["python"]', 'profiles = ["typescript"]'),
+        ('profiles = ["python"]', 'profiles = ["unsupported"]'),
         ("components.root", 'components."bad name"'),
         ('name = "root-tests"', 'name = "Root.Tests"'),
         ('component = "root"', 'component = "missing"'),
@@ -569,10 +569,12 @@ def test_installed_identity_rejects_invalid_state(
         InstallationIdentity(profiles, mode)
 
 
-def test_typescript_is_not_a_supported_production_profile(tmp_path: Path) -> None:
-    assert tuple(p.id for p in ProfileRegistry().profiles) == ("python",)
-    with pytest.raises(ConfigurationError, match="Unsupported profile: typescript"):
-        resolve_configuration(tmp_path, language="typescript")
+def test_typescript_resolves_its_own_required_default_plan(tmp_path: Path) -> None:
+    assert tuple(p.id for p in ProfileRegistry().profiles) == ("python", "typescript")
+    resolved = resolve_configuration(tmp_path, language="typescript")
+    assert resolved.configuration.profiles == ("typescript",)
+    assert len(resolved.configuration.checks) == 5
+    assert all(c.argv[:2] == ("npm", "run") for c in resolved.configuration.checks)
 
 
 def test_fixture_profile_requires_explicit_commands_without_python_fallback(

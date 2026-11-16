@@ -510,7 +510,7 @@ def test_bad_mapping_does_not_fall_back_to_python(
         config.write_text("[broken", encoding="utf-8")
     else:
         config.write_text(
-            component_configuration((("app", ".", ("typescript",)),)), encoding="utf-8"
+            component_configuration((("app", ".", ("unsupported",)),)), encoding="utf-8"
         )
     assert main(["doctor", str(tmp_path)]) == 1
     output = capsys.readouterr().out

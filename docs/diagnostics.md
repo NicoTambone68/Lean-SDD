@@ -79,6 +79,22 @@ validation contract and must never be presented as a passed application check.
 Invalid mappings and missing declared component/check directories are already
 failures in doctor: the selected location must exist to inspect its setup.
 
+## TypeScript component observations
+
+For each TypeScript component, doctor reads package.json and tsconfig.json (at
+most 1 MiB each), plus package-lock.json (at most 8 MiB). Missing files warn;
+malformed, oversized, linked, inaccessible or incompatible files fail. tsconfig
+may contain comments and trailing commas, but inheritance/references need separate
+support. Node/npm declarations, required scripts, strict NodeNext compilation and
+source/output containment must match the supported contract. Conflicting manager
+locks fail without replacement. Manifest/root-lock metadata must agree.
+
+These are bounded declaration checks, not proof of installed tool versions,
+lock freshness, dependency-graph correctness or script behavior. Doctor never
+runs Node, npm or configuration modules. A component selecting both profiles gets
+both independent sets of diagnostics. The complete profile contract is installed
+at `.agents/docs/typescript.md` when TypeScript is selected.
+
 ## Configuration edits and historical hashes
 
 A deliberate mapping edit can move or add components within the installed
@@ -123,5 +139,5 @@ recorded content without loading whole files into memory.
 
 The Python API is `diagnose(target, registry=BUILTIN_PROFILES) -> list[Check]`.
 The explicit in-process registry is for controlled integration and inert tests;
-project TOML cannot register executable callbacks, imports, or plugins. Only
-Python is a supported production profile in this increment.
+project TOML cannot register executable callbacks, imports, or plugins. Python
+and TypeScript are the supported production profiles.

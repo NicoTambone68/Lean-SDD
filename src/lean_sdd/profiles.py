@@ -64,15 +64,39 @@ PYTHON = Profile(
 )
 
 
+TYPESCRIPT_DEFAULT_SCRIPTS = (
+    ("types", "typecheck"),
+    ("lint", "lint"),
+    ("format", "format:check"),
+    ("tests", "test"),
+    ("build", "build"),
+)
+
+TYPESCRIPT = Profile(
+    "typescript",
+    "TypeScript",
+    tuple(
+        RequiredCheck(category)
+        for category in ("types", "lint", "format", "tests", "build")
+    ),
+    tools=("node", "npm"),
+    diagnostic="typescript",
+    resources=(
+        Resource("standards.md", ".agents/standards/typescript.md"),
+        Resource("guide.md", ".agents/docs/typescript.md"),
+    ),
+)
+
+
 @dataclass(frozen=True)
 class ProfileRegistry:
     """Explicit in-process catalog, with no filesystem or plugin discovery.
 
     Additional entries support inert fixtures and future bundled profiles. The
-    production default contains only Python, whose obligations cannot be replaced.
+    built-in Python and TypeScript obligations cannot be replaced.
     """
 
-    profiles: tuple[Profile, ...] = (PYTHON,)
+    profiles: tuple[Profile, ...] = (PYTHON, TYPESCRIPT)
 
     def __post_init__(self) -> None:
         if not isinstance(self.profiles, tuple) or not self.profiles:
@@ -115,6 +139,10 @@ class ProfileRegistry:
                     raise ValueError("Invalid mandatory command argument tuple.")
             if profile.id == "python" and profile != PYTHON:
                 raise ValueError("The Python profile cannot replace mandatory checks.")
+            if profile.id == "typescript" and profile != TYPESCRIPT:
+                raise ValueError(
+                    "The TypeScript profile cannot replace mandatory checks."
+                )
             _resource_metadata(profile)
 
     def get(self, profile_id: str) -> Profile:
@@ -137,10 +165,14 @@ def _resource_metadata(profile: Profile) -> None:
         ):
             raise ValueError("Tools and skills must be unique identifier tuples.")
     # Keys identify known future dispatch, never an import path or callable.
-    if profile.diagnostic not in (None, "python"):
+    if profile.diagnostic not in (None, "python", "typescript"):
         raise ValueError("Unknown built-in diagnostic selection.")
     if profile.diagnostic == "python" and profile.id != "python":
         raise ValueError("Python diagnostics belong only to the Python profile.")
+    if profile.diagnostic == "typescript" and profile.id != "typescript":
+        raise ValueError(
+            "TypeScript diagnostics belong only to the TypeScript profile."
+        )
     if not isinstance(profile.resources, tuple):
         raise ValueError("Profile resources must be an explicit tuple.")
     destinations: set[str] = set()

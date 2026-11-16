@@ -23,6 +23,7 @@ from lean_sdd.configuration import (
 from lean_sdd.installer import InstallError, check_path
 from lean_sdd.profiles import BUILTIN_PROFILES, ProfileRegistry
 from lean_sdd.templates import STATE_PATH, parse_installation_state
+from lean_sdd.typescript import inspect_typescript
 
 MAX_METADATA_BYTES = 1024 * 1024
 Status = Literal[
@@ -127,8 +128,20 @@ def _python_preconditions(config: Configuration, root: Path) -> None:
         _regular_file(root / component.path / "uv.lock", f"{context} uv.lock")
 
 
+def _typescript_preconditions(config: Configuration, root: Path) -> None:
+    for component in config.components:
+        if "typescript" not in component.profiles:
+            continue
+        for observation in inspect_typescript(root, component, config.checks):
+            if observation.status != "PASS":
+                raise ConfigurationError(
+                    f"Component {component.id} ({component.path}), "
+                    f"TypeScript: {observation.message}"
+                )
+
+
 def check_execution_boundaries(plan: ValidationPlan) -> None:
-    """Recheck platform, directories and Python metadata before launch."""
+    """Recheck platform, directories and selected profile metadata before launch."""
     if (
         sys.platform != "linux"
         or threading.current_thread() is not threading.main_thread()
@@ -138,6 +151,7 @@ def check_execution_boundaries(plan: ValidationPlan) -> None:
         )
     validate_directories(plan.configuration, plan.root, require_exists=True)
     _python_preconditions(plan.configuration, plan.root)
+    _typescript_preconditions(plan.configuration, plan.root)
 
 
 def _executable(
@@ -209,6 +223,7 @@ def prepare_validation(
     try:
         validate_directories(resolved.configuration, root, require_exists=True)
         _python_preconditions(resolved.configuration, root)
+        _typescript_preconditions(resolved.configuration, root)
     except ConfigurationError as error:
         problems.append(str(error))
     for item in checks:

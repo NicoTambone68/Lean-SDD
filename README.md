@@ -1,7 +1,7 @@
 # Lean-SDD — GitHub Agent-Assisted Development
 
 Lean-SDD provides an issue-driven development workflow for coding agents working
-on Python projects. It connects a written specification to implementation,
+on Python and TypeScript projects. It connects a written specification to implementation,
 validation, human review, and verified completion through GitHub issues and
 pull requests.
 
@@ -31,9 +31,9 @@ It also aims to be **as system agnostic as practical**. Skills use Bash scripts
 and common command-line tools rather than a model-specific runtime. Portability
 still requires uv, a compatible Bash environment, Git, curl, and jq; the current
 service integration targets GitHub MCP, and the supplied engineering rules and
-validation commands target Python projects.
+validation commands cover Python and Node/npm TypeScript projects.
 
-Python is the only production profile. New languages require their own reviewed
+Python and TypeScript are production profiles. New languages require their own reviewed
 standards, static registry integration, diagnostics, packaging and actual toolchain
 acceptance. Profiles supplement the shared workflow without replacing Python
 rules or weakening governance. The GitHub integration is language independent.
@@ -43,11 +43,12 @@ supporting configuration and documentation to review.
 The [component configuration contract](docs/configuration.md) defines strict
 profile mappings and validation-check configuration, with complete root and
 two-component Python examples. `lean-sdd languages` lists supported profiles;
-Python is currently the only production profile. Initialization consumes this
-configuration but never executes its checks.
+initialization consumes this configuration but never executes its checks.
+The [TypeScript contract](docs/typescript.md) documents its Node/npm requirements
+and mixed component layouts.
 
 The [bundled profile resource API](docs/profiles.md) composes common assets and
-Python standards for fresh installations. Existing version-1 installations keep
+selected language standards for fresh installations. Existing version-1 installations keep
 their legacy layout and records without migration.
 
 Other, more sophisticated SDD tools and frameworks are available and may be
@@ -104,7 +105,7 @@ lean-sdd --version
 
 If the executable directory is not on your PATH, run `uv tool update-shell`
 and restart your shell. A built wheel can also be installed with
-`uv tool install /path/to/lean_sdd_cli-0.2.1-py3-none-any.whl`.
+`uv tool install /path/to/lean_sdd_cli-0.3.0-py3-none-any.whl`.
 The package has not been published to PyPI; installation by the bare name
 `lean-sdd-cli` is not an advertised installation method yet.
 
@@ -121,12 +122,15 @@ lean-sdd doctor /path/to/project
 `init` reports the selected profiles and component mapping in both real and dry
 runs. An existing `lean-sdd.toml` selects the profile union; `--language python`
 is optional and must agree with a single Python component at `.`. For multiple
-components, supply the explicit mapping and omit `--language`. Unsupported
-languages, including TypeScript, fail before writing.
+components, supply the explicit mapping and omit `--language`. Python and
+TypeScript are supported; unknown languages fail before writing.
+For Node/npm projects, use `--language typescript` and review the
+[TypeScript support contract](docs/typescript.md). It covers Node ESM/CommonJS
+on Linux, five required npm checks, and mixed Python/TypeScript components.
 
 Fresh installs without TOML default to Python and generate a root configuration
 with its four required checks. Existing TOML is preserved byte-for-byte. `init`
-installs the governing documents, Python standards at `.agents/standards/python.md`,
+installs the governing documents and selected standards at `.agents/standards/<profile>.md`,
 six skills, shared Bash libraries, environment example, and setup references. It creates missing directories,
 preserves identical existing files, and refuses the entire operation before
 writing if any managed file conflicts. It rejects symbolic links in destination
@@ -148,7 +152,7 @@ preserved. Installation does not provision a repository, select a working
 branch, create issues, scaffold an application, or contact GitHub.
 
 `doctor` checks installed files, local prerequisites, exported MCP configuration,
-and basic Python project metadata. It never loads `.env`, runs project scripts,
+and selected Python/TypeScript project metadata. It never loads `.env`, runs project scripts,
 or makes network requests. It validates the installation record independently
 of the current CLI release, then checks each recorded file against its original
 SHA-256 hash. Both schema versions 1 and 2 are supported; existing version-1
@@ -610,9 +614,10 @@ loader; declare any added skills and assets explicitly.
 [Constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10)
 is incorporated in Constitution 2.0.1: component-local source roots remain within
 repository root `src/`, including when components use the same language.
-[TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11) remains deferred.
-Future Python/TypeScript layouts are examples, not supported configurations.
-Python root and multiple-component configurations work now. Native Windows/macOS
+[TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11) adds the
+[Node/npm profile](docs/typescript.md) in 0.3.0, with real ESM/CommonJS, multiple
+TypeScript components and Python/TypeScript message acceptance. Root and multiple
+components work for both profiles, including both profiles on one component. Native Windows/macOS
 validation and automatic template migration are not supported. See the
 [foundation acceptance matrix](docs/foundation-acceptance.md) for evidence and
 remaining acceptance boundaries.

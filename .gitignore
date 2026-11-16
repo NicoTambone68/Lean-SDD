@@ -53,3 +53,6 @@ dist/
 *.old
 *.trashme
 
+# TypeScript acceptance dependencies and generated test builds
+**/node_modules/
+**/.build/

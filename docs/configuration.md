@@ -3,20 +3,20 @@
 `lean-sdd.toml` uses configuration schema 1. The API and initializer parse and
 resolve explicit component mappings; `lean-sdd languages` lists supported
 production profiles and `init --language python` provides a single-root
-convenience selection. Fresh installations write installation-record schema 2.
-Python is the only supported bundled profile; selecting TypeScript is an error.
+convenience selection. `--language typescript` selects the Node/npm profile.
+Fresh installations write installation-record schema 2 for either profile.
 Initialization and diagnostics never execute configured validation. Doctor
-checks each declared Python component locally. Explicit `lean-sdd validate`
+checks each declared Python or TypeScript component locally. Explicit `lean-sdd validate`
 executes the reviewed plan on Linux; see the [execution contract](validation.md)
 and [diagnostic reference](diagnostics.md).
 
 ## API and trust boundary
 
 `lean_sdd.profiles` supplies immutable `Profile`, `RequiredCheck`, and
-`ProfileRegistry` values. The default static registry contains only Python.
+`ProfileRegistry` values. The default static registry contains Python and TypeScript.
 Explicit in-process registries can supply inert fixtures or later bundled
 profiles. No modules, plugins, commands, or resources are discovered from project
-configuration. The Python entry cannot redefine its mandatory checks.
+configuration. Neither built-in entry can redefine its mandatory checks.
 
 `lean_sdd.configuration` exposes:
 
@@ -108,7 +108,7 @@ For example, `src/api` is a component root containing its manifests and tests;
 its Python package can be in `src/api/src/api_package`. The two source levels
 are intentional. Constitution 2.0.1 explicitly clarifies this existing containment
 rule; no flat source layout is required. Two Python components can use the same
-structure as a future mixed-language repository. Generated application and runtime
+structure as a mixed-language repository. Generated application and runtime
 contract code remain source under repository root `src/`; non-executable schemas
 outside it require explicit scope and cannot contain application behavior.
 
@@ -136,7 +136,13 @@ Python has these fixed obligations, all from that component's root:
 
 Changing the command, adding flags to the mandatory command, changing its cwd,
 omitting a category, or marking it optional is rejected. Add a separate category
-for extra checks. Profiles with `RequiredCheck.argv = None` require the category
+for extra checks. TypeScript requires types, lint, format, tests and build,
+with exactly `["npm", "run", "<reviewed script>"]` at the component root for each.
+Its default scripts are typecheck, lint, format:check, test and build. Flags such
+as --if-present are forbidden. The full Node/npm metadata contract is installed
+at `.agents/docs/typescript.md` with that profile.
+
+Other profiles with `RequiredCheck.argv = None` require the category
 but permit reviewed concrete argv and a cwd within the component. Profiles with
 fixed argv require that exact tuple at the component root. Multiple profiles on
 one component keep separate obligations via `(component, profile, category)`;
@@ -164,7 +170,9 @@ language option or historical installation would otherwise select Python.
    300-second timeout. Provenance is `installed-legacy`.
 5. A fresh installation without TOML defaults to that same Python plan;
    provenance is `fresh-default`, or `language` with explicit Python selection.
-   Additional fixture profiles require explicit configuration; there is no
+   Explicit TypeScript selection generates its own root plan with five required
+   npm checks and 300-second timeouts. Additional fixture profiles require
+   explicit configuration; there is no
    automatic Python fallback or generic scaffold for them.
 
 Any explicit mapping has provenance `explicit`. Mapping/check edits within the
@@ -209,7 +217,7 @@ compatibility behavior and are never converted by initialization.
 
 ## Initialization and record ownership
 
-`initialize(target, dry_run=False, language=None)` returns `InstallResult` with
+`initialize(target, dry_run=False, language=None, registry=BUILTIN_PROFILES)` returns `InstallResult` with
 `created` (planned on dry-run), `unchanged` (identical managed files), `preserved`
 (existing configuration), installed `profiles`, and resolved `configuration`.
 The CLI reports profiles and each component ID/path/profile selection on both
@@ -219,8 +227,8 @@ dependency manifests, or environments, and never executes configured checks.
 
 On a fresh target, common resources plus the selected profile union form the
 managed payload. `--language` never overrides an explicit mapping. Without
-TOML, the default Python plan is serialized to `lean-sdd.toml`, including the
-four mandatory checks at the root. With TOML, all original bytes, comments,
+TOML, the selected root plan is serialized to `lean-sdd.toml`: Python's four
+checks by default, or TypeScript's five when explicitly selected. With TOML, all original bytes, comments,
 line endings, and timestamps are preserved. The installer does not serialize
 user mappings, including mappings for two Python components.
 

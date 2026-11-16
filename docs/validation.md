@@ -19,7 +19,8 @@ condition of execution: reviewed local rules and template customization remain
 user-owned. Use doctor separately to inspect original asset integrity.
 
 The complete mapping/check schema is validated before any process launches:
-mandatory categories, required status, exact Python argv, scope, profile membership,
+mandatory categories, required status, exact Python argv, the TypeScript npm-run
+adapter, scope, profile membership,
 normalized contained paths, and finite positive timeouts. Every component and
 check directory must exist, and symlink/non-directory boundaries are rejected.
 Each Python component requires a regular, readable, UTF-8 `pyproject.toml` of at
@@ -27,6 +28,12 @@ most 1 MiB with a `[project]` table, plus a regular `uv.lock`. Presence is not a
 claim of complete package-metadata validity or lock freshness; those remain the
 responsibility of the actual tools. Missing application files block validation
 even though doctor allows their absence as adoption-time warnings.
+
+TypeScript requires all three bounded metadata files (package.json,
+package-lock.json and tsconfig.json) and compatible declarations. Every missing,
+invalid or unsupported TypeScript observation blocks execution. The profile's
+contract is installed at `.agents/docs/typescript.md`. Metadata checks never
+execute compiler/configuration modules or install dependencies.
 
 Each executable is located before execution using the invocation's PATH. Relative
 executable paths and relative/empty PATH entries resolve against that check's
@@ -54,7 +61,11 @@ uv run ruff format --check .
 uv run mypy .
 ```
 
-Mandatory categories cannot be replaced with another command, marked optional,
+Python mandatory commands cannot be replaced. TypeScript requires types, lint,
+format, tests and build, each using exactly npm run with one reviewed script name
+at the component root. Default scripts are typecheck, lint, format:check, test and
+build; generated check names sort build first. Existing script names may be
+selected explicitly. Neither profile's mandatory categories can be marked optional,
 or satisfied by a project-wide check. All required project-wide integration
 checks are additional obligations. Optional checks remain visible and do not
 satisfy mandatory categories.
@@ -66,7 +77,7 @@ Python configuration uses that same plan. An explicit mapping may use different
 check names, so its alphabetical order can differ.
 
 The plan snapshots configuration and environment at invocation. Directories and
-required Python files are checked again immediately before each launch. A changed
+required profile metadata are checked again immediately before each launch. A changed
 boundary or required-file precondition stops execution and leaves remaining
 checks not run. The runner never reloads changed command definitions to execute
 new instructions mid-suite. Avoid concurrent project/PATH changes; these checks

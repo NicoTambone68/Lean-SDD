@@ -10,6 +10,7 @@ from lean_sdd.configuration import (
     default_configuration_bytes,
     resolve_configuration,
 )
+from lean_sdd.profiles import BUILTIN_PROFILES, ProfileRegistry
 from lean_sdd.templates import (
     STATE_PATH,
     InstallationRecord,
@@ -79,12 +80,14 @@ def _read_record(target: Path) -> tuple[InstallationRecord, bytes] | None:
         raise InstallError(f"Invalid installation record: {error}") from error
 
 
-def _existing_payload(record: InstallationRecord) -> dict[str, bytes]:
+def _existing_payload(
+    record: InstallationRecord, registry: ProfileRegistry
+) -> dict[str, bytes]:
     """Require the exact original release before repairing any missing asset."""
     payload = (
         template_files()
         if record.schema_version == 1
-        else dict(resolve_bundle(record.identity.profiles).payload)
+        else dict(resolve_bundle(record.identity.profiles, registry=registry).payload)
     )
     expected = template_manifest(payload)
     # Configuration is mutable project data. Its original hash remains evidence,
@@ -101,7 +104,11 @@ def _existing_payload(record: InstallationRecord) -> dict[str, bytes]:
 
 
 def initialize(
-    target: Path, *, dry_run: bool = False, language: str | None = None
+    target: Path,
+    *,
+    dry_run: bool = False,
+    language: str | None = None,
+    registry: ProfileRegistry = BUILTIN_PROFILES,
 ) -> InstallResult:
     """Resolve profiles and install missing files after complete read-only preflight.
 
@@ -115,20 +122,25 @@ def initialize(
     check_path(target, directory=True)
     existing = _read_record(target)
     resolved = resolve_configuration(
-        target, installed=existing[0].identity if existing else None, language=language
+        target,
+        installed=existing[0].identity if existing else None,
+        language=language,
+        registry=registry,
     )
     preserved = (CONFIGURATION_NAME,) if resolved.origin == "explicit" else ()
     if existing:
         record, content = existing
         profiles = record.identity.profiles
-        payload = _existing_payload(record)
+        payload = _existing_payload(record, registry)
         payload[STATE_PATH] = content
     else:
-        bundle = resolve_bundle(resolved.configuration.profiles)
+        bundle = resolve_bundle(resolved.configuration.profiles, registry=registry)
         profiles = bundle.profiles
         payload = dict(bundle.payload)
         if not preserved:
-            payload[CONFIGURATION_NAME] = default_configuration_bytes()
+            payload[CONFIGURATION_NAME] = default_configuration_bytes(
+                profiles[0], registry=registry
+            )
         payload[STATE_PATH] = profile_installation_state(
             payload,
             template_version=bundle.template_version,
