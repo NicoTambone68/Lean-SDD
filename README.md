@@ -46,6 +46,11 @@ including complete single-component and multi-component Python examples. This
 foundation does not yet change CLI initialization or diagnostics, execute checks,
 or add TypeScript support.
 
+The [bundled profile resource API](docs/profiles.md) composes common assets and
+Python standards for the next initialization increment. The current initializer
+continues to install the original Python payload without changing its bytes or
+installation-record format.
+
 Other, more sophisticated SDD tools and frameworks are available and may be
 better suited to your application, team size, or process requirements. Lean-SDD
 keeps its scope small. It borrows the principle of a project **constitution**
