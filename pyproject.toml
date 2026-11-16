@@ -58,6 +58,7 @@ only-include = [
     "pyproject.toml",
     "uv.lock",
     "README.md",
+    "docs/configuration.md",
     "AGENTS.md",
     "CONSTITUTION.md",
     "CODING_STANDARDS.md",
