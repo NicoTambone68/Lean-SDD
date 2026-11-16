@@ -104,7 +104,7 @@ lean-sdd --version
 
 If the executable directory is not on your PATH, run `uv tool update-shell`
 and restart your shell. A built wheel can also be installed with
-`uv tool install /path/to/lean_sdd_cli-0.2.0-py3-none-any.whl`.
+`uv tool install /path/to/lean_sdd_cli-0.2.1-py3-none-any.whl`.
 The package has not been published to PyPI; installation by the bare name
 `lean-sdd-cli` is not an advertised installation method yet.
 
@@ -607,8 +607,10 @@ language's commands. Required constitutional changes need separate explicit
 amendment approval. Reuse the six core Bash skills and their uv environment-file
 loader; declare any added skills and assets explicitly.
 
-[TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11) is deferred,
-as is [constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10).
+[Constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10)
+is incorporated in Constitution 2.0.1: component-local source roots remain within
+repository root `src/`, including when components use the same language.
+[TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11) remains deferred.
 Future Python/TypeScript layouts are examples, not supported configurations.
 Python root and multiple-component configurations work now. Native Windows/macOS
 validation and automatic template migration are not supported. See the

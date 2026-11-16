@@ -84,9 +84,11 @@ def test_historical_manifest_preserves_rules_and_scripts() -> None:
     baseline = Path(__file__).parent / "fixtures/legacy-template-manifest.json"
     historical = json.loads(baseline.read_text(encoding="utf-8"))
     current = template_manifest(template_files())
-    # #9 intentionally changes these documents in release 0.2.0. Keep the
-    # historical fixture intact to protect every other original asset byte.
+    # #9 changed workflow documents in 0.2.0; #10 explicitly amended the
+    # constitution in 0.2.1. Keep the historical fixture intact and pin the
+    # approved amendment separately to protect every other original asset byte.
     revised = {
+        "CONSTITUTION.md",
         "AGENTS.md",
         ".agents/README.md",
         ".agents/github-mcp-contract.md",
@@ -102,7 +104,10 @@ def test_historical_manifest_preserves_rules_and_scripts() -> None:
         f".agents/docs/{name}.md"
         for name in ("configuration", "profiles", "diagnostics", "validation")
     }
-    assert package_version() != "0.1.0"
+    assert current["CONSTITUTION.md"] == (
+        "3a4775e0f56bfdee914924e4d5470f697f19904857b659c5c3a7f4c8cc96578a"
+    )
+    assert package_version() not in {"0.1.0", "0.2.0"}
 
 
 def test_python_rules_and_common_workflow_are_preserved() -> None:

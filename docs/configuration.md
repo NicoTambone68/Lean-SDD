@@ -106,7 +106,11 @@ and root `src/`; for a root component, application source is under `src/`.
 
 For example, `src/api` is a component root containing its manifests and tests;
 its Python package can be in `src/api/src/api_package`. The two source levels
-are intentional and do not require a flat source layout or a constitution change.
+are intentional. Constitution 2.0.1 explicitly clarifies this existing containment
+rule; no flat source layout is required. Two Python components can use the same
+structure as a future mixed-language repository. Generated application and runtime
+contract code remain source under repository root `src/`; non-executable schemas
+outside it require explicit scope and cannot contain application behavior.
 
 Equal and ancestor/descendant component paths are rejected, including case-folded
 aliases for portability. Consequently `.` cannot coexist with other components.
