@@ -10,7 +10,12 @@ import pytest
 from lean_sdd.cli import main
 from lean_sdd.doctor import diagnose
 from lean_sdd.installer import initialize
-from lean_sdd.templates import STATE_PATH, package_version, template_files
+from lean_sdd.templates import (
+    STATE_PATH,
+    installation_state,
+    package_version,
+    template_files,
+)
 
 
 @pytest.fixture
@@ -40,8 +45,11 @@ def historical_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     payload[".agents/retired.md"] = b"Retired template\n"
     with monkeypatch.context() as older:
         older.setattr("lean_sdd.templates.package_version", lambda: "0.0.0")
-        older.setattr("lean_sdd.installer.template_files", lambda: payload)
-        initialize(tmp_path)
+        for name, content in payload.items():
+            path = tmp_path / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        (tmp_path / STATE_PATH).write_bytes(installation_state(payload))
     return tmp_path
 
 
@@ -206,7 +214,7 @@ def test_current_version_with_conflicting_manifest_fails(
         (b"{", "not valid JSON"),
         (b"\xff", "not valid UTF-8 JSON"),
         (b"x" * 1_000_001, "too large"),
-        (b'{"schema_version": 2}', "Unsupported installation record schema_version: 2"),
+        (b'{"schema_version": 3}', "Unsupported installation record schema_version: 3"),
         (
             json.dumps(
                 {

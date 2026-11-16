@@ -6,14 +6,16 @@ from pathlib import Path
 import pytest
 
 from lean_sdd.cli import main
+from lean_sdd.configuration import CONFIGURATION_NAME, default_configuration_bytes
 from lean_sdd.installer import InstallError, initialize
-from lean_sdd.templates import STATE_PATH, package_version, template_files
+from lean_sdd.templates import STATE_PATH, package_version, resolve_bundle
 
 
 def test_install_is_complete_and_repeatable(tmp_path: Path) -> None:
     target = tmp_path / "project with spaces"
     first = initialize(target)
-    payload = template_files()
+    payload = dict(resolve_bundle().payload)
+    payload[CONFIGURATION_NAME] = default_configuration_bytes()
     assert set(first.created) == {*payload, STATE_PATH}
     for name, content in payload.items():
         path = target / name
@@ -26,7 +28,7 @@ def test_install_is_complete_and_repeatable(tmp_path: Path) -> None:
     before = {name: (target / name).stat().st_mtime_ns for name in first.created}
     second = initialize(target)
     assert second.created == ()
-    assert set(second.unchanged) == set(first.created)
+    assert set(second.unchanged) | set(second.preserved) == set(first.created)
     assert before == {
         name: (target / name).stat().st_mtime_ns for name in first.created
     }

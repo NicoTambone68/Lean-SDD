@@ -6,11 +6,12 @@ the only production profile. Extra profiles used by tests are inert fixtures,
 not advertised language support. There is no dynamic plugin system, downloaded
 metadata, arbitrary import, or command execution during composition.
 
-The existing CLI still calls `template_files()` for the legacy Python payload.
-Its bytes and version-1 installation records are unchanged. `resolve_bundle()`
-is the separate API for future initialization integration; it does not install
-files, select project mappings, or rewrite historical records. See the
-[configuration contract](configuration.md) for component/profile assignments.
+Fresh initialization uses `resolve_bundle()` for the composed payload and writes
+schema-2 installation records. `template_files()` remains the legacy Python
+adapter for schema-1 reinitialization and diagnostics; its bytes and historical
+records are unchanged. Resource resolution itself does not install files or
+rewrite records. See the [configuration contract](configuration.md) for selection,
+configuration ownership, and repeat-initialization behavior.
 
 ## Resource layout and authority
 

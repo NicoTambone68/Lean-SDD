@@ -48,7 +48,7 @@ def test_historical_version_and_hex_case_are_supported() -> None:
         (record(schema_version=True), "schema_version must be an integer"),
         (record(schema_version="1"), "schema_version must be an integer"),
         (record(schema_version=1.0), "schema_version must be an integer"),
-        (record(schema_version=2), "Unsupported.*schema_version: 2"),
+        (record(schema_version=3), "Unsupported.*schema_version: 3"),
         (record(template_version=None), "template_version must be nonempty text"),
         (record(template_version=1), "template_version must be nonempty text"),
         (record(template_version=""), "template_version must be nonempty text"),
@@ -110,3 +110,75 @@ def test_invalid_records_are_rejected(content: str, message: str) -> None:
 def test_unsafe_or_non_normalized_paths_are_rejected(name: str) -> None:
     with pytest.raises(ValueError, match="Unsafe installation record path"):
         parse_installation_state(record(files={name: "a" * 64}))
+
+
+def profile_record(**changes: object) -> str:
+    state: dict[str, object] = {
+        "schema_version": 2,
+        "profiles": ["python"],
+        "configuration_mode": "configured",
+    }
+    state.update(changes)
+    return record(**state)
+
+
+@pytest.mark.parametrize(
+    ("changes", "message"),
+    [
+        ({"profiles": None}, "profiles"),
+        ({"profiles": "python"}, "profiles"),
+        ({"profiles": []}, "profiles"),
+        ({"profiles": ["python", "python"]}, "sorted unique"),
+        ({"profiles": ["zeta", "python"]}, "sorted unique"),
+        ({"profiles": [True]}, "profiles"),
+        ({"profiles": [{}]}, "profiles"),
+        ({"profiles": ["../python"]}, "profiles"),
+        ({"profiles": ["Python"]}, "profiles"),
+        ({"configuration_mode": None}, "configuration mode"),
+        ({"configuration_mode": False}, "configuration mode"),
+        ({"configuration_mode": "automatic"}, "configuration mode"),
+        (
+            {"configuration_mode": "legacy-python", "profiles": ["retired"]},
+            "Legacy Python",
+        ),
+        (
+            {
+                "configuration_mode": "legacy-python",
+                "files": {"lean-sdd.toml": "a" * 64},
+            },
+            "configured mode",
+        ),
+        ({"files": {".agents/lean-sdd-install.json": "a" * 64}}, "hash itself"),
+        ({"files": {"AGENTS.md": "a" * 64, "agents.md": "b" * 64}}, "collide"),
+        ({"files": {"directory": "a" * 64, "directory/file": "b" * 64}}, "collide"),
+    ],
+)
+def test_schema_two_rejects_invalid_identity_and_manifest(
+    changes: dict[str, object], message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        parse_installation_state(profile_record(**changes))
+
+
+@pytest.mark.parametrize("missing", ["profiles", "configuration_mode"])
+def test_schema_two_requires_identity_fields(missing: str) -> None:
+    state = json.loads(profile_record())
+    del state[missing]
+    with pytest.raises(ValueError):
+        parse_installation_state(json.dumps(state))
+
+
+def test_schema_one_identity_ignores_unrelated_historical_fields() -> None:
+    parsed = parse_installation_state(
+        record(profiles=["retired"], configuration_mode="ignored")
+    )
+    assert parsed.identity.profiles == ("python",)
+    assert parsed.identity.configuration_mode == "legacy-python"
+
+
+def test_schema_two_identity_does_not_require_current_catalog() -> None:
+    parsed = parse_installation_state(
+        profile_record(profiles=["retired", "unavailable"])
+    )
+    assert parsed.identity.profiles == ("retired", "unavailable")
+    assert parsed.identity.configuration_mode == "configured"

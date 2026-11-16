@@ -1,11 +1,12 @@
 # Component and profile configuration contract
 
-This is the schema-1 foundation for `lean-sdd.toml`. The Python API can parse,
-inspect, and resolve it. The current CLI still uses its existing Python-only
-initialization and diagnostics: it does not yet consume this configuration,
-offer language selection, write version-2 installation records, or execute
-configured validation. Those integrations are separate increments. Python is
-the only supported bundled profile; selecting TypeScript is an error.
+`lean-sdd.toml` uses configuration schema 1. The API and initializer parse and
+resolve explicit component mappings; `lean-sdd languages` lists supported
+production profiles and `init --language python` provides a single-root
+convenience selection. Fresh installations write installation-record schema 2.
+Python is the only supported bundled profile; selecting TypeScript is an error.
+Initialization and diagnostics never execute configured validation. Full
+per-component environment diagnostics and a validation runner are later work.
 
 ## API and trust boundary
 
@@ -45,8 +46,9 @@ even when TOML syntax is valid. The authorized workflow must review the issue,
 governing standards, selected profiles, and current command configuration before
 explicitly invoking the future validation runner. Reading a repository, importing
 these modules, initialization, and diagnostics never confer that authority.
-No API in this increment runs subprocesses, reads `.env`, installs dependencies,
-contacts a service, changes process environment, or writes project files.
+The configuration APIs never run subprocesses, read `.env`, install dependencies,
+contact a service, change process environment, or write project files. The
+initializer alone writes the selected installation payload after preflight.
 
 Errors identify validated component/check IDs and fields, without printing raw
 TOML values or command arguments. Applications should present the contextual
@@ -163,9 +165,9 @@ Any explicit mapping has provenance `explicit`. Mapping/check edits within the
 installed set are deliberate configuration changes subject to review; they do
 not perform an asset upgrade. The resolver does not infer installed identity by
 reading an installation record: callers pass it after independent record
-validation. Version-2 serialization and initializer integration are later work.
+validation. The initializer reads and validates that record before resolution.
 
-### Proposed version-2 installation record contract
+### Version-2 installation record contract
 
 The existing record's `schema_version`, `template_version`, and `files` retain
 their meanings. Version 2 adds `profiles` (nonempty, sorted, unique valid IDs)
@@ -184,8 +186,8 @@ requires TOML even if all installed profiles happen to be Python.
 }
 ```
 
-This is a shape illustration, not a valid installation record or a claim that
-version-2 serialization is implemented. `files` records original managed bytes,
+This is a shape illustration; real records contain the actual release and hashes.
+`files` records original managed bytes,
 not command definitions or current component mappings. If init generates
 `lean-sdd.toml`, its original hash belongs in `files`. If it consumes a
 pre-existing user-owned TOML, the file is preserved and not added to that
@@ -195,13 +197,76 @@ regardless of who created it. Never update historical hashes after customization
 Version-1 records adapt to `InstallationIdentity(("python",), "legacy-python")`
 without rewriting their bytes, hashes, or timestamps. Version-2 older-reader
 support is not promised. Updating a CLI does not migrate installations or switch
-their profile assets. Fresh installs using explicit mappings require configured
-mode; no-config compatibility installs can retain legacy-python mode.
+their profile assets. All fresh installs use configured mode, generating a
+configuration when absent. Existing legacy-python records retain their no-TOML
+compatibility behavior and are never converted by initialization.
+
+## Initialization and record ownership
+
+`initialize(target, dry_run=False, language=None)` returns `InstallResult` with
+`created` (planned on dry-run), `unchanged` (identical managed files), `preserved`
+(existing configuration), installed `profiles`, and resolved `configuration`.
+The CLI reports profiles and each component ID/path/profile selection on both
+real and dry runs. User configuration content and command arguments are not
+printed. It never creates application component directories, scaffolding,
+dependency manifests, or environments, and never executes configured checks.
+
+On a fresh target, common resources plus the selected profile union form the
+managed payload. `--language` never overrides an explicit mapping. Without
+TOML, the default Python plan is serialized to `lean-sdd.toml`, including the
+four mandatory checks at the root. With TOML, all original bytes, comments,
+line endings, and timestamps are preserved. The installer does not serialize
+user mappings, including mappings for two Python components.
+
+The schema-2 record contains original hashes of the final managed bytes (after
+profile composition and link relocation). If configuration was generated, its
+original hash is included; if configuration was pre-existing, it is excluded.
+The record does not hash itself or copy current commands/mappings. Its profile
+list must be a nonempty sorted array of unique valid IDs; mode is mandatory.
+Generated configuration requires configured mode. Case-folded and file/directory
+path collisions are invalid. Profile availability is separate from parsing:
+a historical record with unavailable profiles is valid data, but init fails
+instead of replacing its identity with Python.
+
+Repeat initialization is conservative:
+
+- Schema 1 resolves legacy Python and uses the legacy payload. Its record bytes,
+  digest spelling, extra historical fields, and timestamps remain untouched.
+  It does not add composed profile assets or generate configuration.
+- Schema 2 uses the full recorded profile set, even if the current mapping uses
+  a subset. Configured mode requires a valid TOML file; neither a default nor a
+  matching language option can replace a missing one. Legacy-python mode still
+  permits the implicit root mapping without generating a file.
+- The current template release and template manifest must agree with the record.
+  Any release difference or template conflict stops all writes; initialization
+  is not an upgrade mechanism. Identical managed files are untouched, and missing
+  assets may be restored only from the matching release and original manifest.
+- Valid deliberate configuration edits within the installed set are preserved.
+  Generated configuration remains editable: its original hash is never replaced
+  with a hash of the edited file. Doctor reports customization against that hash;
+  it cannot reconstruct or certify the original generated mapping from a digest.
+  User-owned configuration has no managed-file hash, but is still required and
+  validated. Init never repairs, rewrites, or switches the current mapping.
+
+Every managed destination, including generated TOML and the record, is checked
+before writes. Conflicts, unsafe paths, and links fail even in dry-run mode.
+Real installation uses exclusive file creation and writes the record last.
+A write failure cleans up only files and empty directories created by that
+invocation, including generated configuration. Cleanup failures report leftover
+paths for explicit recovery. Dry runs create neither files nor directories.
+The filesystem must not be concurrently modified; this is bounded rollback on
+reported failures, not a crash-safe transaction or protection against hostile
+filesystem races. After an interrupted process, inspect partial output before
+retrying; the installer never assumes an uncertain write can be overwritten.
+
+Older CLI releases need not understand schema 2. Installing a newer CLI does
+not update project templates, migrate records, or switch installed profiles.
+Compare a fresh installation in a separate directory when reviewing an upgrade.
 
 ## Complete root Python example
 
-The current CLI does not yet consume this file. It is a valid schema-1 input to
-the Python API; creating it does not authorize running any command.
+Save this as `lean-sdd.toml` before initialization to select a root component
+named `app`. Creating or parsing it does not authorize running any command.
 
 ```toml
 schema_version = 1

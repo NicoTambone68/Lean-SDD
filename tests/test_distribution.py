@@ -181,8 +181,22 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     target = tmp_path / "fresh project"
     run([str(executable), "init", str(target)], tmp_path, env)
     assert (target / STATE_PATH).is_file()
-    for name, content in payload.items():
+    for name, content in composed.payload.items():
         assert (target / name).read_bytes() == content
+    state = json.loads((target / STATE_PATH).read_text(encoding="utf-8"))
+    assert state["schema_version"] == 2
+    assert state["profiles"] == ["python"]
+    assert state["configuration_mode"] == "configured"
+    assert (
+        state["files"]["lean-sdd.toml"]
+        == hashlib.sha256((target / "lean-sdd.toml").read_bytes()).hexdigest()
+    )
+    assert "python: Python" in run([str(executable), "languages"], tmp_path, env).stdout
+    repeated = run(
+        [str(executable), "init", str(target), "--language", "python"], tmp_path, env
+    )
+    assert "Profiles: python" in repeated.stdout
+    assert "Created " not in repeated.stdout
     # Doctor stays local and its diagnostics remain usable in an isolated install.
     result = subprocess.run(
         [str(executable), "doctor", str(target)],
