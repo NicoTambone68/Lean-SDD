@@ -213,6 +213,45 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     assert not result.stderr
     assert "Component root (.), profile python: No pyproject.toml" in result.stdout
 
+    if sys.platform == "linux":
+        # The installed validator runs only an inert uv stand-in, never project
+        # dependency installation or live services during the distribution test.
+        (target / "pyproject.toml").write_text(
+            '[project]\nname="smoke"\n', encoding="utf-8"
+        )
+        (target / "uv.lock").write_text("version=1\n", encoding="utf-8")
+        validation_bin = tmp_path / "validation-bin"
+        validation_bin.mkdir()
+        validation_log = tmp_path / "validation-events.jsonl"
+        uv_fixture = validation_bin / "uv"
+        uv_fixture.write_text(
+            f"#!{sys.executable}\nimport json,sys,os\n"
+            f"with open({str(validation_log)!r},'a',encoding='utf-8') as f:\n"
+            " f.write(json.dumps([os.getcwd(),sys.argv[1:]])+'\\n')\n",
+            encoding="utf-8",
+        )
+        uv_fixture.chmod(0o755)
+        validation_env = dict(
+            env, PATH=str(validation_bin) + os.pathsep + env.get("PATH", "")
+        )
+        validation_result = run(
+            [str(executable), "validate", str(target)], tmp_path, validation_env
+        )
+        assert validation_result.stdout.count("passed:") == 4
+        events = [
+            json.loads(line)
+            for line in validation_log.read_text(encoding="utf-8").splitlines()
+        ]
+        assert events == [
+            [str(target), argv]
+            for argv in (
+                ["run", "ruff", "format", "--check", "."],
+                ["run", "ruff", "check", "."],
+                ["run", "pytest"],
+                ["run", "mypy", "."],
+            )
+        ]
+
     # Profile diagnostics also work from an isolated wheel for edited mappings.
     examples = re.findall(
         r"```toml\n(.*?)```",

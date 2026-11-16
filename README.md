@@ -196,6 +196,32 @@ Skill invocations require uv for environment-file loading and Bash 4 or newer
 plus Git, curl, jq, awk, grep, and mktemp. On Windows, use a compatible
 environment such as WSL for the complete workflow; installing the Python CLI alone does not supply these prerequisites.
 
+## Execute reviewed validation
+
+After reviewing the current rules and `lean-sdd.toml`, explicitly run:
+
+```bash
+lean-sdd validate /path/to/project
+```
+
+Execution currently requires Linux. The command prepares the entire required
+suite before launching a process, then runs checks sequentially by check name.
+Python components retain the four mandatory uv/pytest/Ruff/mypy commands; all
+required project checks also run. Missing Python manifests or lockfiles block
+validation even though doctor reports their absence as setup warnings.
+
+Ordinary failures and timeouts remain visible while later runnable checks
+continue. Required unsuccessful or unrun checks prevent success; optional
+failures alone do not. Cancellation stops the suite and cleans the active process
+group. Child output streams directly to the invoking terminal; commands and
+inherited credentials must be reviewed before running. The runner does not load
+`.env`, install anything independently, retry commands, or grant trust to project
+code. Commands themselves can modify files, synchronize dependencies, or use
+network/credential access available to the invoking user.
+
+See the [execution contract](docs/validation.md) for preflight requirements,
+result states, exit codes, cleanup guarantees and limitations, and output handling.
+
 ## Principles and responsibilities
 
 The workflow preserves traceability, reproducibility, explicit failures, and

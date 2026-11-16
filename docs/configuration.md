@@ -6,8 +6,9 @@ production profiles and `init --language python` provides a single-root
 convenience selection. Fresh installations write installation-record schema 2.
 Python is the only supported bundled profile; selecting TypeScript is an error.
 Initialization and diagnostics never execute configured validation. Doctor
-checks each declared Python component locally; the validation runner remains a
-later increment. See the [diagnostic reference](diagnostics.md).
+checks each declared Python component locally. Explicit `lean-sdd validate`
+executes the reviewed plan on Linux; see the [execution contract](validation.md)
+and [diagnostic reference](diagnostics.md).
 
 ## API and trust boundary
 
@@ -35,7 +36,7 @@ configuration. The Python entry cannot redefine its mandatory checks.
 
 Use parsed/resolved configurations with `validate_directories`; manually
 constructed dataclasses are trusted internal values, not a runtime validation
-boundary. Revalidate paths immediately before future execution. Directory checks
+boundary. Revalidate paths immediately before execution. Directory checks
 cover the root and its ancestors as well as configured descendants. Root paths
 containing `..` are rejected. The repository must not be concurrently mutated
 during inspection: these checks are not an OS sandbox or a defense against a
@@ -45,7 +46,7 @@ contract, not a scan of every application file.
 Parsing argv is **not execution approval**. Project commands are executable code
 even when TOML syntax is valid. The authorized workflow must review the issue,
 governing standards, selected profiles, and current command configuration before
-explicitly invoking the future validation runner. Reading a repository, importing
+explicitly invoking `lean-sdd validate`. Reading a repository, importing
 these modules, initialization, and diagnostics never confer that authority.
 The configuration APIs never run subprocesses, read `.env`, install dependencies,
 contact a service, change process environment, or write project files. The
@@ -83,7 +84,7 @@ are errors. A boolean is not an integer or timeout. Fields are case-sensitive.
 Component/profile/category/check identifiers match `[a-z][a-z0-9_-]{0,63}`.
 Profile selections and resolved components are sorted by ID; checks are sorted
 by their globally unique name. The resulting profile union is sorted and unique.
-Explicit order in TOML does not change this order. Future runners should consume
+Explicit order in TOML does not change this order. The validation runner consumes
 the complete resolved check tuple; no dependency-selective execution is implied.
 
 The configuration is at most 1 MiB of UTF-8, with at most 128 components and
