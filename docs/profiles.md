@@ -38,7 +38,7 @@ enter the distributions; credentials and live acceptance evidence stay excluded.
 
 | Asset | Authoritative source | Installed destination |
 | --- | --- | --- |
-| Constitution | root `CONSTITUTION.md`, unchanged | `CONSTITUTION.md` |
+| Constitution | root `CONSTITUTION.md`, including explicitly approved amendments | `CONSTITUTION.md` |
 | Workflow and six core skills | root `AGENTS.md` and explicitly listed `.agents/` assets | original paths |
 | Shared standards | `src/lean_sdd/template_overrides/common-standards.md` | `CODING_STANDARDS.md` in composed bundles |
 | Python rules | root `CODING_STANDARDS.md`, unchanged | `.agents/standards/python.md` in composed bundles; `CODING_STANDARDS.md` in legacy output |
@@ -196,10 +196,13 @@ checks cannot verify prose. Test multiple profiles per component, cross-componen
 required failures, package imports, artifact composition and actual toolchain
 execution before advertising support through `languages`.
 
-The staged follow-ups are [constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10)
-and [TypeScript support #11](https://github.com/NicoTambone68/Lean-SDD/issues/11).
-Neither is delivered by the foundation. A future example, unusable until the
-TypeScript increment ships, is a Python component at `src/api/` and a TypeScript
+[Constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10)
+was separately approved and incorporated in Constitution 2.0.1, preserving root
+`src/` containment. Template release 0.2.1 includes that authoritative amendment;
+existing project constitutions and installation records are not migrated.
+[TypeScript support #11](https://github.com/NicoTambone68/Lean-SDD/issues/11)
+remains deferred. A future example, unusable until that increment ships, is a
+Python component at `src/api/` and a TypeScript
 component at `src/worker/`, with sources inside their component-local `src/`.
 Each owns its manifests/lockfile; project-wide interface tests cover their shared
 contracts. Multiple Python components already use this layout without a new

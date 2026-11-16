@@ -1,8 +1,8 @@
 # Python Project Constitution
 
-Version: 2.0.0
+Version: 2.0.1
 Ratified: 2026-08-17
-Last amended: 2026-10-12
+Last amended: 2026-11-16
 
 ## Purpose and Authority
 
@@ -61,10 +61,21 @@ services, or mutate persistent state. Resource ownership and lifetime MUST be
 clear. Concurrent work MUST define ownership of shared state and its
 synchronization, cancellation, and shutdown behavior.
 
-Project source MUST remain under `src/`. Tests, documentation, configuration,
-and other non-source artifacts outside `src/` MAY change only within the
-approved scope. Application behavior MUST NOT be moved into those artifacts
-to evade the source boundary.
+Project source MUST remain under repository root `src/`, including application
+and runtime code and generated application or contract code. Executable scripts
+MUST NOT be exempted from this source boundary.
+
+A single component rooted at `.` MUST keep its application source under repository
+root `src/`. Multiple components MAY be rooted beneath that directory, for example
+at `src/api/` and `src/worker/`, with component-local manifests, tests, and source
+roots such as `src/api/src/` and `src/worker/src/`. Component structure is independent
+of language count: multiple components MAY use the same language or different
+languages. These layouts MUST preserve repository-root source containment.
+
+Tests, documentation, configuration, non-executable schemas, and other non-source
+artifacts outside repository root `src/` MAY change only within the approved
+scope. Application behavior MUST NOT be moved into those artifacts to evade the
+source boundary.
 
 Rationale: Explicit boundaries limit coupling and make failures easier to isolate.
 
@@ -171,6 +182,12 @@ Constitution versions follow semantic versioning:
 Every amendment MUST update the version and last-amended date.
 
 ### Amendment Record
+
+- **2.0.1 — 2026-11-16:** Explicitly approved clarification of Principle III for
+  component roots and component-local source roots beneath repository root
+  `src/`, including multiple components using the same language. Preserved source
+  containment for executable, runtime, generated application and contract code;
+  distinguished scoped non-executable artifacts without relaxing any principle.
 
 - **2.0.0 — 2026-10-12:** Explicitly requested generalization for Python projects.
   Replaced domain-specific invariants with broadly applicable correctness,

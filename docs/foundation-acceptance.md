@@ -25,9 +25,9 @@ to establish results for a particular checkout.
 
 ## Release and manual review
 
-Release 0.2.0 deliberately revises workflow/setup documentation and adds installed
-references under `.agents/docs/`. The root constitution and Python standards are
-unchanged. Each package resource has one authoritative source and explicit wheel
+Release 0.2.0 revised workflow/setup documentation and added installed references
+under `.agents/docs/`. That foundation increment left the root constitution and
+Python standards unchanged. Each package resource has one authoritative source and explicit wheel
 mapping; setup links and Python standards' two root links are relocated only for
 installation. Runtime code stays under `src/`. The sdist includes tests and these
 references so it can rebuild the same runtime/resources independently.
@@ -46,9 +46,24 @@ The complete final required suite includes all components and required integrati
 checks; optional failures must stay visible. Command review precedes execution,
 including when configuration edits are themselves the issue being implemented.
 
+## Separately approved governance clarification
+
+[Issue #10](https://github.com/NicoTambone68/Lean-SDD/issues/10) applies the explicitly
+approved Principle III clarification as Constitution 2.0.1, dated 2026-11-16.
+It distinguishes repository roots, component roots and component-local source
+roots without changing source containment or coupling component count to language
+count. Root Python, two Python components and future mixed-language examples all
+keep application/runtime/generated code under repository root `src/`.
+
+Template release 0.2.1 distinguishes the amended asset from release 0.2.0. Existing
+installations retain their original constitution and hashes; adoption requires a
+separately reviewed manual change. Python standards, runtime behavior and workflow
+gates are unchanged. The policy test retains the historical manifest and pins the
+approved amended constitution; distribution tests verify the same source bytes in
+both artifact formats. This follow-up does not change the historical #9 scope.
+
 ## Deferred acceptance
 
-- [Constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10): separately approved amendment, preserving root `src/` containment.
 - [TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11): standards, real toolchain, TypeScript-only and Python/TypeScript interface acceptance. No fixture or future layout proves this support.
 - Other languages, application scaffolds, dynamic/downloaded profiles, automatic migration/profile switching and dependency-based final-check selection remain out of scope.
 - Validation is Linux-only (including Linux under WSL); native Windows/macOS execution acceptance is not supplied. Owned process-group cleanup is not a sandbox; detached descendants/services are unsupported.
