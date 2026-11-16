@@ -1,9 +1,10 @@
 """Strict component configuration contracts, without command execution or writes.
 
-The CLI does not consume these APIs yet. See docs/configuration.md for schema 1,
+Initialization consumes these APIs. See docs/configuration.md for schema 1,
 installation identity precedence, and the separate reviewed-execution boundary.
 """
 
+import json
 import math
 import stat
 import tomllib
@@ -74,7 +75,7 @@ class InstallationIdentity:
 
     Version 1 maps to (('python',), 'legacy-python'). Version 2 stores these two
     fields alongside template_version and original hashes. It stores no current
-    mapping or command copies. Record serialization remains a later increment.
+    mapping or command copies.
     """
 
     profiles: tuple[str, ...]
@@ -463,3 +464,35 @@ def resolve_configuration(
     config = _legacy_python()
     validate_directories(config, root)
     return ResolvedConfiguration(config, origin)
+
+
+def default_configuration_bytes() -> bytes:
+    """Render the fixed root Python plan as schema-1 TOML, without execution.
+
+    Only the built-in default is serialized. User-owned configurations are never
+    round-tripped or rewritten by initialization.
+    """
+    lines = [
+        "schema_version = 1",
+        "",
+        "[components.root]",
+        'path = "."',
+        'profiles = ["python"]',
+    ]
+    for check in _legacy_python().checks:
+        lines.extend(
+            [
+                "",
+                "[[checks]]",
+                f"name = {json.dumps(check.name)}",
+                'scope = "component"',
+                'component = "root"',
+                'profile = "python"',
+                f"category = {json.dumps(check.category)}",
+                'cwd = "."',
+                f"argv = {json.dumps(check.argv)}",
+                "required = true",
+                f"timeout_seconds = {DEFAULT_TIMEOUT_SECONDS:g}",
+            ]
+        )
+    return ("\n".join(lines) + "\n").encode("utf-8")

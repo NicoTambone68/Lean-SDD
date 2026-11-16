@@ -8,6 +8,7 @@ from pathlib import Path
 
 from lean_sdd.doctor import diagnose
 from lean_sdd.installer import InstallError, initialize
+from lean_sdd.profiles import BUILTIN_PROFILES
 from lean_sdd.templates import package_version
 
 
@@ -27,14 +28,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     init.add_argument(
         "--dry-run", action="store_true", help="Check and list changes without writing."
     )
+    init.add_argument("--language", help="Select a supported single root profile.")
+    commands.add_parser("languages", help="List supported bundled language profiles.")
     doctor = commands.add_parser(
         "doctor", help="Check local setup without network access."
     )
     doctor.add_argument("directory", nargs="?", type=Path, default=Path("."))
     args = parser.parse_args(argv)
     try:
+        if args.command == "languages":
+            for profile in BUILTIN_PROFILES.profiles:
+                print(f"{profile.id}: {profile.display_name}")
+            return 0
         if args.command == "init":
-            result = initialize(args.directory, dry_run=args.dry_run)
+            result = initialize(
+                args.directory, dry_run=args.dry_run, language=args.language
+            )
+            print(f"Profiles: {', '.join(result.profiles)}")
+            for component in result.configuration.components:
+                print(
+                    f"Component {component.id}: {component.path} "
+                    f"[{', '.join(component.profiles)}]"
+                )
+            for name in result.preserved:
+                print(f"Preserved existing configuration: {name}")
             for name in result.created:
                 print(f"{'Would create' if args.dry_run else 'Created'} {name}")
             print(f"{len(result.unchanged)} identical files left unchanged.")

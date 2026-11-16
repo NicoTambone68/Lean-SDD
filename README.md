@@ -40,16 +40,15 @@ workflow and GitHub integration are independent of the application language.
 See [adapting to another language](#adapting-to-another-language) for the
 supporting configuration and documentation to review.
 
-The [component configuration contract](docs/configuration.md) defines the new
-Python API for strict profile mappings and validation-check configuration,
-including complete single-component and multi-component Python examples. This
-foundation does not yet change CLI initialization or diagnostics, execute checks,
-or add TypeScript support.
+The [component configuration contract](docs/configuration.md) defines strict
+profile mappings and validation-check configuration, with complete root and
+two-component Python examples. `lean-sdd languages` lists supported profiles;
+Python is currently the only production profile. Initialization consumes this
+configuration but never executes its checks.
 
 The [bundled profile resource API](docs/profiles.md) composes common assets and
-Python standards for the next initialization increment. The current initializer
-continues to install the original Python payload without changing its bytes or
-installation-record format.
+Python standards for fresh installations. Existing version-1 installations keep
+their legacy layout and records without migration.
 
 Other, more sophisticated SDD tools and frameworks are available and may be
 better suited to your application, team size, or process requirements. Lean-SDD
@@ -112,22 +111,37 @@ The package has not been published to PyPI; installation by the bare name
 Initialize a separate target project:
 
 ```bash
-lean-sdd init /path/to/project --dry-run
-lean-sdd init /path/to/project
+lean-sdd languages
+lean-sdd init /path/to/project --language python --dry-run
+lean-sdd init /path/to/project --language python
 lean-sdd doctor /path/to/project
 ```
 
-Both commands default to the current directory when the path is omitted.
-`init` installs the governing documents, six skills, shared Bash libraries,
-configuration example, and setup references. It creates missing directories,
+`init` and `doctor` default to the current directory when the path is omitted.
+`init` reports the selected profiles and component mapping in both real and dry
+runs. An existing `lean-sdd.toml` selects the profile union; `--language python`
+is optional and must agree with a single Python component at `.`. For multiple
+components, supply the explicit mapping and omit `--language`. Unsupported
+languages, including TypeScript, fail before writing.
+
+Fresh installs without TOML default to Python and generate a root configuration
+with its four required checks. Existing TOML is preserved byte-for-byte. `init`
+installs the governing documents, Python standards at `.agents/standards/python.md`,
+six skills, shared Bash libraries, environment example, and setup references. It creates missing directories,
 preserves identical existing files, and refuses the entire operation before
 writing if any managed file conflicts. It rejects symbolic links in destination
 paths. There is no overwrite flag or automatic upgrade; compare a fresh install
 in a separate directory when adapting existing project rules. Do not modify the
 target concurrently during initialization.
 
-The installer records the template version and original file hashes in
-`.agents/lean-sdd-install.json`. Commit this record with the installed workflow.
+Fresh installs record schema version 2, the template release, installed profiles,
+configuration mode, and original managed-file hashes in
+`.agents/lean-sdd-install.json`. Generated TOML is hashed; user-provided TOML is
+not claimed as an installed asset. Commit the record and configuration with the
+workflow. Repeat initialization preserves the recorded hashes even after valid
+configuration edits, and never rewrites component mappings or switches profiles.
+A configured installation missing its TOML fails instead of regenerating defaults.
+See [record ownership and reinitialization](docs/configuration.md#initialization-and-record-ownership).
 It also adds `.agents/.gitignore` to exclude local environment files and logs.
 Existing `.env`, project README, application files, and Git configuration are
 preserved. Installation does not provision a repository, select a working
@@ -137,7 +151,12 @@ branch, create issues, scaffold an application, or contact GitHub.
 and basic Python project metadata. It never loads `.env`, runs project scripts,
 or makes network requests. It validates the installation record independently
 of the current CLI release, then checks each recorded file against its original
-SHA-256 hash. Existing schema-version-1 records need no migration.
+SHA-256 hash. Both schema versions 1 and 2 are supported; existing version-1
+records need no migration. Schema-2 diagnostics also validate configuration
+against installed identity. Full per-component environment diagnostics are a
+later increment; current Python environment observations still concern the root.
+Unavailable installed profiles produce a compatibility failure while their
+recorded file hashes remain inspectable, rather than a malformed-record error.
 
 - `PASS`: The installed file matches its recorded original content. A record
   with the current template version and identical manifest also passes.
@@ -149,8 +168,12 @@ SHA-256 hash. Existing schema-version-1 records need no migration.
 - `FAIL`: A record is malformed or uses an unsupported schema, a path is unsafe
   (including symbolic links), a recorded file is missing or unreadable, or a
   required tool is missing. A record claiming the current template version but
-  containing a different manifest also fails and identifies the discrepancies.
+  containing a different template manifest also fails and identifies the
+  discrepancies. Invalid/missing required configuration or unavailable installed
+  profiles also fail. A customized generated TOML is compared with its original
+  recorded hash, not with today's default configuration.
 
+Older CLI releases need not understand schema version 2.
 Updating the CLI does not update a project's installed templates or its record.
 An installation-version warning does not by itself indicate corruption or
 require immediate migration. Files introduced only in the newer release are

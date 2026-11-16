@@ -13,6 +13,7 @@ from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import NoReturn
 
+from lean_sdd.configuration import InstallationIdentity
 from lean_sdd.paths import safe_relative_path as _safe_template_path
 from lean_sdd.profiles import BUILTIN_PROFILES, ProfileRegistry
 
@@ -87,6 +88,7 @@ class InstallationRecord:
     schema_version: int
     template_version: str
     files: dict[str, str]
+    identity: InstallationIdentity = InstallationIdentity(("python",), "legacy-python")
 
 
 def _record_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
@@ -103,7 +105,7 @@ def _invalid_json_constant(value: str) -> NoReturn:
 
 
 def parse_installation_state(content: str) -> InstallationRecord:
-    """Validate schema v1 JSON without accessing recorded paths or releases.
+    """Validate schema v1/v2 JSON without accessing recorded paths or releases.
 
     Raises:
         ValueError: The record is malformed, unsupported, or contains unsafe paths.
@@ -125,7 +127,7 @@ def parse_installation_state(content: str) -> InstallationRecord:
     schema = state.get("schema_version")
     if type(schema) is not int:
         raise ValueError("Installation record schema_version must be an integer.")
-    if schema != 1:
+    if schema not in (1, 2):
         raise ValueError(f"Unsupported installation record schema_version: {schema}.")
     template_version = state.get("template_version")
     if not isinstance(template_version, str) or not template_version.strip():
@@ -143,7 +145,27 @@ def parse_installation_state(content: str) -> InstallationRecord:
         ):
             raise ValueError(f"Invalid SHA-256 digest for recorded template: {name!r}.")
         validated[name] = digest.lower()
-    return InstallationRecord(schema, template_version, validated)
+    identity = InstallationIdentity(("python",), "legacy-python")
+    if schema == 2:
+        profiles = state.get("profiles")
+        mode = state.get("configuration_mode")
+        if not isinstance(profiles, list):
+            raise ValueError("Installation record profiles must be a nonempty array.")
+        if mode not in ("legacy-python", "configured"):
+            raise ValueError("Invalid installed configuration mode.")
+        identity = InstallationIdentity(tuple(profiles), mode)
+        if STATE_PATH in validated:
+            raise ValueError("Installation record cannot hash itself.")
+        if "lean-sdd.toml" in validated and mode != "configured":
+            raise ValueError("Managed configuration requires configured mode.")
+        folded = {name.casefold() for name in validated}
+        if len(folded) != len(validated) or any(
+            str(parent) in folded
+            for name in folded
+            for parent in PurePosixPath(name).parents
+        ):
+            raise ValueError("Installation record paths collide.")
+    return InstallationRecord(schema, template_version, validated, identity)
 
 
 def template_manifest(payload: Mapping[str, bytes]) -> dict[str, str]:
@@ -422,3 +444,22 @@ def installation_state(payload: dict[str, bytes]) -> bytes:
         "files": template_manifest(payload),
     }
     return (json.dumps(state, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def profile_installation_state(
+    payload: Mapping[str, bytes],
+    *,
+    template_version: str,
+    identity: InstallationIdentity,
+) -> bytes:
+    """Serialize original bytes and catalog-independent identity as schema 2."""
+    state = {
+        "schema_version": 2,
+        "template_version": template_version,
+        "profiles": identity.profiles,
+        "configuration_mode": identity.configuration_mode,
+        "files": template_manifest(payload),
+    }
+    content = json.dumps(state, indent=2, sort_keys=True) + "\n"
+    parse_installation_state(content)
+    return content.encode("utf-8")

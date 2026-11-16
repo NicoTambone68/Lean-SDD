@@ -9,12 +9,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+from lean_sdd.configuration import (
+    CONFIGURATION_NAME,
+    ConfigurationError,
+    resolve_configuration,
+)
 from lean_sdd.installer import InstallError, check_path
 from lean_sdd.templates import (
     STATE_PATH,
     InstallationRecord,
     package_version,
     parse_installation_state,
+    resolve_bundle,
     template_files,
     template_manifest,
 )
@@ -63,10 +69,40 @@ def _installation_checks(target: Path) -> list[Check]:
         return [Check("FAIL", f"Invalid installation record: {error}")]
     except OSError:
         return [Check("FAIL", "Cannot read installation record; check file access.")]
-    checks = _compatibility_checks(
-        record, template_manifest(template_files()), package_version()
-    )
-    return checks + _installed_file_checks(target, record)
+    try:
+        payload = (
+            template_files()
+            if record.schema_version == 1
+            else resolve_bundle(record.identity.profiles).payload
+        )
+        manifest = template_manifest(payload)
+        if record.schema_version == 2 and CONFIGURATION_NAME in record.files:
+            # Current configuration may have been customized. Its historical hash
+            # is checked against disk below, not recomputed from current defaults.
+            manifest[CONFIGURATION_NAME] = record.files[CONFIGURATION_NAME]
+        checks = _compatibility_checks(record, manifest, package_version())
+    except ValueError as error:
+        checks = [Check("FAIL", f"Installed profile bundle unavailable: {error}")]
+    checks += _installed_file_checks(target, record)
+    if record.schema_version == 2:
+        try:
+            resolve_configuration(target, installed=record.identity)
+        except ConfigurationError as error:
+            checks.append(Check("FAIL", f"Installed configuration: {error}"))
+        else:
+            checks.append(
+                Check(
+                    "PASS",
+                    "Installed profile configuration is valid; commands not executed.",
+                )
+            )
+            checks.append(
+                Check(
+                    "WARN",
+                    "Per-component environment diagnostics are not yet available.",
+                )
+            )
+    return checks
 
 
 def _compatibility_checks(
