@@ -71,9 +71,11 @@ configuration contract, and additionally declares:
   checking for or launching those tools. Python declares `python`, `uv`, `pytest`,
   `ruff`, and `mypy`; uv remains a shared workflow requirement too.
 - `diagnostic`: a built-in dispatch key, currently `python` for the Python profile
-  or `None` for inert fixtures. It is never a module name or callable. The doctor
-  integration is separate work. A new production diagnostic requires an explicit
-  code change and acceptance; a different profile cannot borrow Python diagnostics.
+  or `None` for inert fixtures. It is never a module name or callable. Doctor
+  dispatches Python checks at each selected component root and reports unavailable
+  application diagnostics for `None`. A new production diagnostic requires an
+  explicit code change and acceptance; a different profile cannot borrow Python
+  diagnostics. See the [diagnostic reference](diagnostics.md).
 - `resources`: explicit `Resource(source, destination)` values. Source paths are
   relative to packaged `profiles/<id>/`; destinations are repository-relative.
   A composable profile must include `.agents/standards/<id>.md` with nonempty UTF-8

@@ -152,11 +152,15 @@ and basic Python project metadata. It never loads `.env`, runs project scripts,
 or makes network requests. It validates the installation record independently
 of the current CLI release, then checks each recorded file against its original
 SHA-256 hash. Both schema versions 1 and 2 are supported; existing version-1
-records need no migration. Schema-2 diagnostics also validate configuration
-against installed identity. Full per-component environment diagnostics are a
-later increment; current Python environment observations still concern the root.
+records need no migration. Diagnostics validate the component mapping against
+installed identity, then inspect Python metadata and lockfile presence at each
+declared Python component root. A legacy installation without TOML keeps its
+implicit root Python component. Missing application manifests/lockfiles are
+warnings; invalid mappings, component directories, and malformed metadata fail.
 Unavailable installed profiles produce a compatibility failure while their
 recorded file hashes remain inspectable, rather than a malformed-record error.
+See the [diagnostic reference](docs/diagnostics.md) for observation boundaries,
+metadata limits, and why a setup warning may still block later validation.
 
 - `PASS`: The installed file matches its recorded original content. A record
   with the current template version and identical manifest also passes.
