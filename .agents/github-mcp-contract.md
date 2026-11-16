@@ -213,7 +213,8 @@ real Bash Git entry point against temporary bare repositories, including a
 remote advance before synchronization. The old string-based CodeCommit checks
 were removed with the original test module.
 
-Run `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`,
+Lean-SDD Python maintenance commands (historical transport/issue test evidence
+is not application acceptance): `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`,
 `uv run mypy .`, and `bash -n` on the two library scripts. Production never
 loads the fixtures or Python test code.
 
@@ -222,3 +223,14 @@ appropriate token/policy access to that repository, separately working Git
 SSH/HTTPS credentials, the applicable approvals and
 live acceptance evidence. No repository provisioning, history migration,
 remote replacement, production-agent edits, or promotion is included in A.
+
+## Application validation boundary
+
+Application checks follow root `AGENTS.md`: composed installations use explicitly
+reviewed `lean-sdd validate .`, with all required component and project checks.
+Read shared and applicable profile standards and review configuration changes
+before executing commands. The Python commands above maintain this implementation;
+they are not an unconditional root application requirement. uv remains the common
+`--no-project --env-file` loader for Bash skills, independent of application language.
+See [setup](README.md#validation-and-readiness). These contracts and inert tests
+do not establish live GitHub permissions, current server policy, or acceptance.

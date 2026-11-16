@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -26,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def run(
-    arguments: list[str], cwd: Path, env: dict[str, str]
+    arguments: list[str], cwd: Path, env: dict[str, str], *, expected: int = 0
 ) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         arguments,
@@ -37,7 +38,7 @@ def run(
         timeout=120,
         check=False,
     )
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode == expected, result.stdout + result.stderr
     return result
 
 
@@ -72,8 +73,15 @@ def test_bundled_links_resolve_and_scripts_parse(
     } == CORE_SKILLS
 
 
-def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
-    env = os.environ.copy()
+@pytest.mark.parametrize("artifact", ["wheel", "sdist-rebuilt-wheel"])
+def test_wheel_and_sdist_install_without_checkout(
+    tmp_path: Path, artifact: str
+) -> None:
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"PATH", "HOME", "TMPDIR", "TEMP", "SYSTEMROOT", "UV_CACHE_DIR"}
+    }
     env.pop("PYTHONPATH", None)
     env.pop("VIRTUAL_ENV", None)
     env.pop("GITHUB_TOKEN", None)
@@ -82,9 +90,49 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     env["UV_TOOL_DIR"] = str(tmp_path / "tools")
     env["UV_TOOL_BIN_DIR"] = str(tmp_path / "bin")
     output = tmp_path / "dist"
+    # Build a clean allowed-source snapshot with deliberate untracked exclusions.
+    # Never copy real environment files or private workflow evidence into tests.
+    source = tmp_path / "source"
+    source.mkdir()
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    targets = project["tool"]["hatch"]["build"]["targets"]
+    for name in targets["sdist"]["only-include"]:
+        origin, destination = ROOT / name, source / name
+        if origin.is_dir():
+            shutil.copytree(
+                origin,
+                destination,
+                ignore=shutil.ignore_patterns(
+                    ".env*",
+                    "__pycache__",
+                    "*.pyc",
+                    ".pytest_cache",
+                    ".mypy_cache",
+                    ".ruff_cache",
+                ),
+            )
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(origin, destination)
+    sentinel = b"-".join((b"EXCLUDED", b"LOCAL", b"ACCEPTANCE", b"SENTINEL"))
+    excluded = (
+        ".env",
+        ".agents/.env",
+        ".agents/live-evidence.json",
+        ".agents/github-workflow-acceptance.md",
+        "local-result.json",
+        "src/lean_sdd/.env.local",
+        "tests/.env.private",
+        "src/lean_sdd/__pycache__/secret.pyc",
+        "tests/.pytest_cache/local",
+    )
+    for name in excluded:
+        path = source / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(sentinel)
     run(
         ["uv", "build", "--no-sources", "--offline", "--out-dir", str(output)],
-        ROOT,
+        source,
         env,
     )
     wheel = next(output.glob("*.whl"))
@@ -101,6 +149,7 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     assert len(packaged) == len(mappings)
     with zipfile.ZipFile(wheel) as bundle:
         names = bundle.namelist()
+        assert all(sentinel not in bundle.read(name) for name in names)
         installed = {
             name.removeprefix("lean_sdd_templates/")
             for name in names
@@ -117,6 +166,13 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
         )
         assert zipped == composed
     with tarfile.open(archive) as bundle:
+        for member in bundle.getmembers():
+            if member.isfile():
+                stream = bundle.extractfile(member)
+                assert stream is not None
+                with stream:
+                    assert sentinel not in stream.read(), member.name
+        assert any(name.endswith("/.agents/.env.example") for name in bundle.getnames())
         assert not any(name.endswith("/.env") for name in bundle.getnames())
         assert not any(
             name.endswith("/.agents/github-workflow-acceptance.md")
@@ -143,8 +199,17 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
             resolve_bundle(resource_root=zipfile.Path(bundle, "lean_sdd_templates/"))
             == composed
         )
+    selected_wheel = wheel if artifact == "wheel" else next(rebuilt.glob("*.whl"))
     run(
-        ["uv", "tool", "install", "--offline", "--python", sys.executable, str(wheel)],
+        [
+            "uv",
+            "tool",
+            "install",
+            "--offline",
+            "--python",
+            sys.executable,
+            str(selected_wheel),
+        ],
         tmp_path,
         env,
     )
@@ -178,6 +243,18 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
         f"lean-sdd {package_version()}"
         in run([str(executable), "--version"], tmp_path, env).stdout
     )
+    dry_target = tmp_path / "dry project"
+    dry = run([str(executable), "init", str(dry_target), "--dry-run"], tmp_path, env)
+    assert "Profiles: python" in dry.stdout
+    assert not dry_target.exists()
+    unsupported = run(
+        [str(executable), "init", str(dry_target), "--language", "typescript"],
+        tmp_path,
+        env,
+        expected=1,
+    )
+    assert "Unsupported profile" in unsupported.stderr
+    assert not dry_target.exists()
     target = tmp_path / "fresh project"
     run([str(executable), "init", str(target)], tmp_path, env)
     assert (target / STATE_PATH).is_file()
@@ -191,7 +268,9 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
         state["files"]["lean-sdd.toml"]
         == hashlib.sha256((target / "lean-sdd.toml").read_bytes()).hexdigest()
     )
-    assert "python: Python" in run([str(executable), "languages"], tmp_path, env).stdout
+    assert (
+        run([str(executable), "languages"], tmp_path, env).stdout == "python: Python\n"
+    )
     repeated = run(
         [str(executable), "init", str(target), "--language", "python"], tmp_path, env
     )
@@ -216,6 +295,10 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     if sys.platform == "linux":
         # The installed validator runs only an inert uv stand-in, never project
         # dependency installation or live services during the distribution test.
+        blocked = run(
+            [str(executable), "validate", str(target)], tmp_path, env, expected=1
+        )
+        assert blocked.stdout.count("not-run:") == 4
         (target / "pyproject.toml").write_text(
             '[project]\nname="smoke"\n', encoding="utf-8"
         )
@@ -227,7 +310,9 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
         uv_fixture.write_text(
             f"#!{sys.executable}\nimport json,sys,os\n"
             f"with open({str(validation_log)!r},'a',encoding='utf-8') as f:\n"
-            " f.write(json.dumps([os.getcwd(),sys.argv[1:]])+'\\n')\n",
+            " f.write(json.dumps([os.getcwd(),sys.argv[1:]])+'\\n')\n"
+            "sys.exit(7 if os.environ.get('FAIL_SHARED') "
+            "and 'tests/integration' in sys.argv else 0)\n",
             encoding="utf-8",
         )
         uv_fixture.chmod(0o755)
@@ -255,7 +340,7 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     # Profile diagnostics also work from an isolated wheel for edited mappings.
     examples = re.findall(
         r"```toml\n(.*?)```",
-        (ROOT / "docs/configuration.md").read_text(encoding="utf-8"),
+        (target / ".agents/docs/configuration.md").read_text(encoding="utf-8"),
         re.DOTALL,
     )
     (target / "lean-sdd.toml").write_text(examples[1], encoding="utf-8")
@@ -277,6 +362,78 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     )
     assert "Locally modified template: 'lean-sdd.toml'" in component_result.stdout
     assert "Component root" not in component_result.stdout
+
+    record_before = (target / STATE_PATH).read_bytes()
+    if sys.platform == "linux":
+        (target / "src/worker/pyproject.toml").write_text(
+            '[project]\nname="worker"\n', encoding="utf-8"
+        )
+        (target / "src/worker/uv.lock").write_text("version=1\n", encoding="utf-8")
+        validation_log.unlink()
+        multi = run(
+            [str(executable), "validate", str(target)], tmp_path, validation_env
+        )
+        assert multi.stdout.count("passed:") == 9
+        events = [json.loads(line) for line in validation_log.read_text().splitlines()]
+        assert [event[0] for event in events] == (
+            [str(target / "src/api")] * 4
+            + [str(target)]
+            + [str(target / "src/worker")] * 4
+        )
+        assert events[4][1] == ["run", "pytest", "tests/integration"]
+        failure = run(
+            [str(executable), "validate", str(target)],
+            tmp_path,
+            dict(validation_env, FAIL_SHARED="1"),
+            expected=1,
+        )
+        assert failure.stdout.count("failed:") == 1
+        assert failure.stdout.count("passed:") == 8
+        assert "shared-contracts" in failure.stdout
+    run([str(executable), "init", str(target)], tmp_path, env)
+    assert (target / STATE_PATH).read_bytes() == record_before
+    # A pre-existing example mapping is user-owned, including formatting/mtime.
+    user_target = tmp_path / "user-owned"
+    user_target.mkdir()
+    user_config = user_target / "lean-sdd.toml"
+    user_config.write_text("# user-owned\n" + examples[0], encoding="utf-8")
+    original_config = (user_config.read_bytes(), user_config.stat().st_mtime_ns)
+    run([str(executable), "init", str(user_target)], tmp_path, env)
+    assert (user_config.read_bytes(), user_config.stat().st_mtime_ns) == original_config
+    user_record = json.loads((user_target / STATE_PATH).read_text())
+    assert "lean-sdd.toml" not in user_record["files"]
+
+    if sys.platform == "linux":
+        (user_target / "pyproject.toml").write_text(
+            '[project]\nname="documented-root"\n', encoding="utf-8"
+        )
+        (user_target / "uv.lock").write_text("version=1\n", encoding="utf-8")
+        documented_root = run(
+            [str(executable), "validate", str(user_target)], tmp_path, validation_env
+        )
+        assert documented_root.stdout.count("passed:") == 4
+        assert (
+            user_config.read_bytes(),
+            user_config.stat().st_mtime_ns,
+        ) == original_config
+
+    # Profile catalog compatibility must not mask original integrity failures.
+    unknown_record = json.loads(record_before)
+    unknown_record["profiles"] = ["retired"]
+    (target / STATE_PATH).write_text(json.dumps(unknown_record), encoding="utf-8")
+    (target / "AGENTS.md").write_text("Local customization\n", encoding="utf-8")
+    (target / ".agents/.env.example").unlink()
+    unknown = run([str(executable), "doctor", str(target)], tmp_path, env, expected=1)
+    assert "Locally modified template: 'AGENTS.md'" in unknown.stdout
+    assert "Missing installed template: '.agents/.env.example'" in unknown.stdout
+    assert "retired" in unknown.stdout
+    if sys.platform == "linux":
+        run(
+            [str(executable), "validate", str(target)],
+            tmp_path,
+            validation_env,
+            expected=1,
+        )
 
     # A historical fixture requires no historical release or network access.
     older = tmp_path / "older project"
@@ -309,6 +466,8 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
         )
         for name in [*old_payload, STATE_PATH]
     }
+    refused = run([str(executable), "init", str(older)], tmp_path, env, expected=1)
+    assert "no migration" in refused.stderr
     for _ in range(2):
         result = run([str(executable), "doctor", str(older)], tmp_path, env)
         assert (

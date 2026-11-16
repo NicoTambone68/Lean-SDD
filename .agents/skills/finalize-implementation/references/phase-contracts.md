@@ -165,8 +165,12 @@ GitHub URL validation reads are substituted; Git operations still execute. The
 MCP fixture explicitly advances the bare remote when delivering a simulated
 server merge response. Constructing that fixture graph never replaces the
 production `merge_pull_request` call. Events verify exact order and arguments,
-not skill wording. Required validation remains pytest, Ruff lint/format, mypy,
-Bash syntax checks and supplementary Bash linting when available.
+not skill wording. Those historical Python maintenance checks are pytest, Ruff
+lint/format, mypy, Bash syntax and supplementary Bash linting when available.
+Composed applications follow root `AGENTS.md`: review all relevant standards and
+configuration before `lean-sdd validate .`, including required component and
+project integration checks. The scripts do not run application validation or
+replace its approval gates. Historical fixtures do not prove current acceptance.
 
 ## Failure and recovery handoff
 

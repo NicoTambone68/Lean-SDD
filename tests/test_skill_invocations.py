@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from lean_sdd.installer import initialize
-from lean_sdd.templates import template_files
+from lean_sdd.templates import resolve_bundle
 
 # These are explicit caller inputs, not values selected from dotenv configuration.
 ARGUMENTS = {
@@ -43,7 +43,7 @@ INVOCATIONS = [
 
 def invocation(skill: str, script: str) -> str:
     """Use the actual first invocation example for this entry point."""
-    document = template_files()[f".agents/skills/{skill}/SKILL.md"].decode()
+    document = resolve_bundle().payload[f".agents/skills/{skill}/SKILL.md"].decode()
     entrypoint = f".agents/skills/{skill}/scripts/{script}.sh"
     for match in re.finditer(r"```bash\n(.*?)\n```", document, re.DOTALL):
         block = match.group(1)

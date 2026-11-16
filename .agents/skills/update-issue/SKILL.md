@@ -31,7 +31,11 @@ issue before the finalization checkpoint.
 
 ## Implementation checkpoint
 
-Only after implementation, required validation, and commit succeed:
+Only after implementation, required validation, and commit succeed. Follow root
+`AGENTS.md` for the validation gate: record the full component/project suite and
+visible optional outcomes for composed applications, or the four maintenance
+commands for this Python repository. Do not replace required integration checks
+with isolated language checks or describe doctor as executed validation:
 
 ```text
 • Implemented and committed <description>.

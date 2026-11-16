@@ -375,6 +375,23 @@ def _python_standards(content: bytes) -> bytes:
     return content
 
 
+def _common_resources(root: Traversable) -> dict[str, bytes]:
+    """Relocate setup links to the installed private documentation directory.
+
+    The source setup document and installed asset share one authority. Only the
+    four declared reference links move; no executable template language is used.
+    """
+    payload = _read_tree(root.joinpath("common"))
+    setup = payload.get(".agents/README.md", b"")
+    for name in ("configuration", "profiles", "diagnostics", "validation"):
+        source = f"](../docs/{name}.md)".encode()
+        if setup.count(source) != 1:
+            raise ValueError("Setup documentation has unexpected reference links.")
+        setup = setup.replace(source, f"](docs/{name}.md)".encode())
+    payload[".agents/README.md"] = setup
+    return payload
+
+
 def resolve_bundle(
     selected_profiles: Iterable[str] = ("python",),
     *,
@@ -396,7 +413,7 @@ def resolve_bundle(
     root = resource_root if resource_root is not None else files("lean_sdd_templates")
     if isinstance(root, Path) and root.is_symlink():
         raise ValueError("Resource root must not be a symlink.")
-    common = _read_tree(root.joinpath("common"))
+    common = _common_resources(root)
     contributions: dict[str, dict[str, bytes]] = {}
     profile_root = root.joinpath("profiles")
     if isinstance(profile_root, Path) and profile_root.is_symlink():
@@ -420,14 +437,15 @@ def resolve_bundle(
 
 
 def template_files() -> dict[str, bytes]:
-    """Return the unchanged legacy Python payload used by init and doctor.
+    """Return the current release reference in the legacy Python layout.
 
     Both APIs reuse the same canonical common assets and Python standards source.
+    Reference bytes may change between releases; existing records stay untouched.
     This compatibility adapter selects the original root Python standards instead
     of rendering shared/profile standards. It does not change installation records.
     """
     root = files("lean_sdd_templates")
-    payload = _read_tree(root.joinpath("common"))
+    payload = _common_resources(root)
     python = _read_tree(root.joinpath("profiles", "python"))
     if set(python) != {"standards.md"}:
         raise ValueError("Legacy Python standards source is missing or invalid.")

@@ -33,10 +33,10 @@ still requires uv, a compatible Bash environment, Git, curl, and jq; the current
 service integration targets GitHub MCP, and the supplied engineering rules and
 validation commands target Python projects.
 
-Although conceived for Python projects, Lean-SDD can be readily adapted to any
-programming language by updating `CONSTITUTION.md`, `AGENTS.md`, and
-`CODING_STANDARDS.md` for that language and its toolchain. The issue-driven
-workflow and GitHub integration are independent of the application language.
+Python is the only production profile. New languages require their own reviewed
+standards, static registry integration, diagnostics, packaging and actual toolchain
+acceptance. Profiles supplement the shared workflow without replacing Python
+rules or weakening governance. The GitHub integration is language independent.
 See [adapting to another language](#adapting-to-another-language) for the
 supporting configuration and documentation to review.
 
@@ -104,7 +104,7 @@ lean-sdd --version
 
 If the executable directory is not on your PATH, run `uv tool update-shell`
 and restart your shell. A built wheel can also be installed with
-`uv tool install /path/to/lean_sdd_cli-0.1.0-py3-none-any.whl`.
+`uv tool install /path/to/lean_sdd_cli-0.2.0-py3-none-any.whl`.
 The package has not been published to PyPI; installation by the bare name
 `lean-sdd-cli` is not an advertised installation method yet.
 
@@ -391,7 +391,12 @@ that directory must be part of the approved scope.
 
 ### 3. Validate, commit, and record implementation
 
-The Python project validation required by `AGENTS.md` runs from the project root:
+For composed applications, review all applicable standards and `lean-sdd.toml`,
+including command changes, then run `lean-sdd validate .` from the project root.
+It executes all required component and project checks; focused checks do not
+replace the final gate. Supply and review interface tests for interacting components.
+
+This Lean-SDD repository and legacy Python installations retain these root commands:
 
 ```bash
 uv run pytest
@@ -594,36 +599,21 @@ operation contracts consistent.
 
 ### Adapting to another language
 
-The main adaptation is in the project rules and validation environment:
+Add one language through a dedicated issue using the
+[profile-authoring contract](docs/profiles.md#adding-a-future-bundled-profile).
+Preserve one constitution, workflow and shared standards, plus every applicable
+language standard. Do not replace Python's rules or validation with another
+language's commands. Required constitutional changes need separate explicit
+amendment approval. Reuse the six core Bash skills and their uv environment-file
+loader; declare any added skills and assets explicitly.
 
-- **`CONSTITUTION.md`:** update Python-specific wording and runtime support
-  requirements. Review the mandatory `src/` boundary against the target
-  language's layout; changing it requires an explicit constitutional amendment.
-  Preserve the general correctness, security, verification, and reliability
-  principles, and record approved amendments with their rationale and version.
-- **`CODING_STANDARDS.md`:** replace Python idioms, typing, packaging, and tool
-  requirements with the target language's conventions and quality standards.
-- **`AGENTS.md`:** update language references and replace the `uv`, pytest, Ruff,
-  and mypy commands with the project's build, test, lint, format, and applicable
-  static-analysis commands. Keep engineering rules in the two rule documents
-  and preserve the issue workflow, approval gates, and failure handling here.
-- **Project configuration:** supply the target ecosystem's dependency manifests,
-  lockfiles, build configuration, tests, and any CI checks. Review `.gitignore`
-  for language-specific build outputs, caches, and local environment files.
-  This bundle does not supply an application scaffold or CI configuration.
-- **Supporting documentation:** update this README and `.agents/README.md` for
-  the new setup and validation commands. Review validation references in the
-  MCP, issue, and finalization contract documents linked below. Preserve
-  historical acceptance evidence as historical; record new validation and
-  acceptance results for the adapted project.
-
-The existing Bash skills and shared libraries handle Git and GitHub MCP
-operations without running the application's Python checks, so changing the
-application language does not normally require rewriting them. Their uv, Bash,
-Git, curl, jq, and GitHub MCP prerequisites still apply; uv remains the
-environment-file loader even for non-Python applications. Verify the adapted
-validation commands and complete the acceptance workflow before claiming the
-new configuration is ready.
+[TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11) is deferred,
+as is [constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10).
+Future Python/TypeScript layouts are examples, not supported configurations.
+Python root and multiple-component configurations work now. Native Windows/macOS
+validation and automatic template migration are not supported. See the
+[foundation acceptance matrix](docs/foundation-acceptance.md) for evidence and
+remaining acceptance boundaries.
 
 ## Developing and packaging the installer
 
@@ -662,9 +652,9 @@ Upgrading the CLI does not update previously initialized projects automatically.
 
 ## Validation and further reading
 
-For an adopting Python project, use the validation commands above and additional
-checks required by its specification. For Bash changes, include syntax checks
-and relevant deterministic operational tests.
+For composed applications, use reviewed `lean-sdd validate .` with all required
+component/project checks. For this repository, run the four maintenance commands.
+For Bash changes, include syntax checks and relevant deterministic operational tests.
 
 The [acceptance record](.agents/github-workflow-acceptance.md) describes offline
 fixtures from the original port, including simulated MCP responses and local

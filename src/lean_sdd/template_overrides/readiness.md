@@ -16,7 +16,10 @@ project with the actual installed scripts:
 2. Create and read back a real issue with a complete plan. Stop for implementation
    approval, then retrieve the issue again as the authoritative specification.
 3. Prepare the selected branch, implement, validate, commit, and record the
-   implementation checkpoint. Stop for publication approval.
+   implementation checkpoint. Read shared and relevant profile standards and review
+   the mapping/commands before explicit component validation. Record all required
+   component/project results and visible optional outcomes. Doctor is not this
+   gate. Stop for publication approval.
 4. Publish and verify the PR, retain its exact source/base identity and JSON
    result, and record its checkpoint. Stop for separate merge approval.
 5. Merge the approved source, verify the remote result and local synchronization,

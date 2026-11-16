@@ -101,7 +101,8 @@ The matrix covers main and non-main bases, remote advances, invalid/missing
 inputs, dirty/detached/existing-branch states, wrong fetch/push destinations,
 rewritten URLs, divergence/local-ahead, and operation failures.
 
-Validation commands: `uv run pytest`, `uv run ruff check .`,
+Lean-SDD Python maintenance commands (historical transport/issue test evidence
+is not application acceptance): `uv run pytest`, `uv run ruff check .`,
 `uv run ruff format --check .`, `uv run mypy .`, and `bash -n` for changed/new
 Bash files. Production loads no Python tests or fixtures.
 
@@ -126,3 +127,14 @@ Bash files. Production loads no Python tests or fixtures.
 - A failed comment stops without recursive audit. Unconfirmed closure stops
   without assuming open/closed or adding a failure comment. Unknown create/write
   outcomes must be reconciled, never automatically retried.
+
+## Application validation boundary
+
+Application checks follow root `AGENTS.md`: composed installations use explicitly
+reviewed `lean-sdd validate .`, with all required component and project checks.
+Read shared and applicable profile standards and review configuration changes
+before executing commands. The Python commands above maintain this implementation;
+they are not an unconditional root application requirement. uv remains the common
+`--no-project --env-file` loader for Bash skills, independent of application language.
+See [setup](README.md#validation-and-readiness). These contracts and inert tests
+do not establish live GitHub permissions, current server policy, or acceptance.

@@ -439,3 +439,39 @@ argv = ["uv", "run", "pytest", "tests/integration"]
 required = true
 timeout_seconds = 600
 ```
+
+## Running the examples
+
+Use the first TOML block as `lean-sdd.toml` in an existing root Python project.
+Its `pyproject.toml` must declare pytest, Ruff and mypy, and `uv.lock` must be
+present. Review the standards, tool configuration and check argv before running:
+
+```bash
+uv sync --locked
+lean-sdd init . --language python --dry-run
+lean-sdd init . --language python
+lean-sdd doctor .
+lean-sdd validate .
+```
+
+For the second block, supply independently configured Python projects at
+`src/api/` and `src/worker/`, each with its own `pyproject.toml`, `uv.lock`, tests
+and component-local source under `src/`. The required `shared-contracts` example
+also needs a root test environment (`pyproject.toml` and lockfile) and meaningful
+`tests/integration` tests for interacting components. Root test metadata does not
+add an overlapping root component. Review and prepare each environment, then
+run from the repository root:
+
+```bash
+lean-sdd init . --dry-run
+lean-sdd init .
+lean-sdd doctor .
+lean-sdd validate .
+```
+
+Do not supply `--language` for the multiple-component mapping. Init preserves
+existing TOML bytes and does not create application files or synchronize tools.
+Validation requires Linux (including WSL), executes actual reviewed project code,
+and may have the normal dependency/network effects of its tools. Tests run these
+plans with inert uv substitutes to verify orchestration; they do not prove that
+an arbitrary application's tests or dependency configuration work.

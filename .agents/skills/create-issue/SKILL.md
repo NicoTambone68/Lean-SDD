@@ -5,7 +5,9 @@ description: Create a GitHub issue with an explicit repository, meaningful title
 
 Before execution, establish the user's selected `OWNER` and `REPO`. Prepare a
 meaningful title and full Markdown plan, including relevant components, approach,
-technical considerations, validation, and Constitution Check. Do not omit or
+technical considerations, validation, and Constitution Check. Include affected
+components/shared interfaces, applicable profile standards, and the full required
+component/project validation plan from root `AGENTS.md`. Do not omit or
 summarize the body when passing it to the script.
 
 Run from the project root using uv to load `.agents/.env` as described in
