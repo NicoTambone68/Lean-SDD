@@ -5,8 +5,9 @@ resolve explicit component mappings; `lean-sdd languages` lists supported
 production profiles and `init --language python` provides a single-root
 convenience selection. Fresh installations write installation-record schema 2.
 Python is the only supported bundled profile; selecting TypeScript is an error.
-Initialization and diagnostics never execute configured validation. Full
-per-component environment diagnostics and a validation runner are later work.
+Initialization and diagnostics never execute configured validation. Doctor
+checks each declared Python component locally; the validation runner remains a
+later increment. See the [diagnostic reference](diagnostics.md).
 
 ## API and trust boundary
 

@@ -211,6 +211,33 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     assert "Local checks only" in result.stdout
     assert "PASS: Installation record matches current release" in result.stdout
     assert not result.stderr
+    assert "Component root (.), profile python: No pyproject.toml" in result.stdout
+
+    # Profile diagnostics also work from an isolated wheel for edited mappings.
+    examples = re.findall(
+        r"```toml\n(.*?)```",
+        (ROOT / "docs/configuration.md").read_text(encoding="utf-8"),
+        re.DOTALL,
+    )
+    (target / "lean-sdd.toml").write_text(examples[1], encoding="utf-8")
+    for component in ("api", "worker"):
+        (target / "src" / component).mkdir(parents=True)
+    (target / "src/api/pyproject.toml").write_text(
+        '[project]\nname="api"\n', encoding="utf-8"
+    )
+    (target / "src/api/uv.lock").write_text("", encoding="utf-8")
+    (target / "pyproject.toml").write_text("[broken", encoding="utf-8")
+    component_result = run([str(executable), "doctor", str(target)], tmp_path, env)
+    assert (
+        "Component api (src/api), profile python: Python project metadata is present"
+        in component_result.stdout
+    )
+    assert (
+        "Component worker (src/worker), profile python: No pyproject.toml"
+        in component_result.stdout
+    )
+    assert "Locally modified template: 'lean-sdd.toml'" in component_result.stdout
+    assert "Component root" not in component_result.stdout
 
     # A historical fixture requires no historical release or network access.
     older = tmp_path / "older project"
