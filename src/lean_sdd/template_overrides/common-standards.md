@@ -51,8 +51,13 @@ rule. Selecting a profile does not authorize executing its tools.
 The root workflow and each applicable profile define the required validation.
 All required checks must pass before reporting validation success. Distinguish
 passed, failed, and not-run checks; document any additional integration needs.
-The bundled workflow currently retains the four Python maintenance commands.
-No new validation executable is introduced by these standards.
+After reviewing the mapping and commands, the composed application workflow runs
+`lean-sdd validate .` from the repository root on Linux. It runs every required
+component and project check, including applicable interface tests. Python retains
+its four mandatory commands at each component root. Focused checks do not replace
+the final suite. Initialization and doctor never execute these commands; a doctor
+setup warning may still block validation. See [setup](.agents/README.md#validation-and-readiness)
+for command trust, prerequisites, and the separate repository maintenance gate.
 
 Existing Python conventions, typing, documentation, numerical semantics, error
 handling, runtime practices, security, tests, packaging, and static checks remain

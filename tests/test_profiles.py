@@ -38,7 +38,9 @@ def read_resources(root: Traversable) -> dict[str, bytes]:
 
 @pytest.fixture
 def common() -> dict[str, bytes]:
-    return read_resources(files("lean_sdd_templates").joinpath("common"))
+    common = read_resources(files("lean_sdd_templates").joinpath("common"))
+    common[".agents/README.md"] = resolve_bundle().payload[".agents/README.md"]
+    return common
 
 
 @pytest.fixture
@@ -78,11 +80,29 @@ def contribution(profile: Profile) -> dict[str, bytes]:
     }
 
 
-def test_legacy_manifest_is_unchanged() -> None:
+def test_historical_manifest_preserves_rules_and_scripts() -> None:
     baseline = Path(__file__).parent / "fixtures/legacy-template-manifest.json"
-    assert template_manifest(template_files()) == json.loads(
-        baseline.read_text(encoding="utf-8")
-    )
+    historical = json.loads(baseline.read_text(encoding="utf-8"))
+    current = template_manifest(template_files())
+    # #9 intentionally changes these documents in release 0.2.0. Keep the
+    # historical fixture intact to protect every other original asset byte.
+    revised = {
+        "AGENTS.md",
+        ".agents/README.md",
+        ".agents/github-mcp-contract.md",
+        ".agents/github-issue-contract.md",
+        ".agents/github-workflow-acceptance.md",
+        ".agents/skills/finalize-implementation/references/phase-contracts.md",
+        ".agents/skills/create-issue/SKILL.md",
+        ".agents/skills/get-issue/SKILL.md",
+        ".agents/skills/update-issue/SKILL.md",
+    }
+    assert {name for name in historical if historical[name] != current[name]} == revised
+    assert set(current) - set(historical) == {
+        f".agents/docs/{name}.md"
+        for name in ("configuration", "profiles", "diagnostics", "validation")
+    }
+    assert package_version() != "0.1.0"
 
 
 def test_python_rules_and_common_workflow_are_preserved() -> None:
@@ -419,6 +439,7 @@ def test_resource_loading_with_multiple_profiles_and_no_execution(
         "directory-link",
         "oversized",
         "bad-python-links",
+        "bad-setup-links",
     ],
 )
 def test_resource_loader_failure_paths(resource_tree: Path, mutation: str) -> None:
@@ -435,7 +456,19 @@ def test_resource_loader_failure_paths(resource_tree: Path, mutation: str) -> No
         link.symlink_to(resource_tree / "profiles", target_is_directory=True)
     elif mutation == "oversized":
         standards.write_bytes(b"x" * (MAX_RESOURCE_BYTES + 1))
+    elif mutation == "bad-setup-links":
+        (resource_tree / "common/.agents/README.md").write_bytes(b"# Broken setup\n")
     else:
         standards.write_bytes(b"# Missing canonical links\n")
     with pytest.raises(ValueError):
         resolve_bundle(resource_root=resource_tree)
+
+
+def test_setup_relocation_changes_only_declared_links() -> None:
+    source = Path(__file__).parents[1] / ".agents/README.md"
+    expected = source.read_bytes()
+    for name in ("configuration", "profiles", "diagnostics", "validation"):
+        expected = expected.replace(
+            f"](../docs/{name}.md)".encode(), f"](docs/{name}.md)".encode()
+        )
+    assert resolve_bundle().payload[".agents/README.md"] == expected

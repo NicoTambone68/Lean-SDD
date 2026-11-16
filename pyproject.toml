@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lean-sdd-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "Install an issue-driven GitHub workflow for coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -18,13 +18,21 @@ dev = ["pytest>=8,<10", "ruff>=0.11,<1", "mypy>=1.15,<2"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/lean_sdd"]
-exclude = ["src/lean_sdd/template_overrides"]
+exclude = [
+    "src/lean_sdd/template_overrides",
+    "**/.env*", "**/__pycache__", "**/*.pyc",
+    "**/.pytest_cache", "**/.mypy_cache", "**/.ruff_cache",
+]
 
 [tool.hatch.build.targets.wheel.force-include]
 "AGENTS.md" = "lean_sdd_templates/common/AGENTS.md"
 "CONSTITUTION.md" = "lean_sdd_templates/common/CONSTITUTION.md"
 "CODING_STANDARDS.md" = "lean_sdd_templates/profiles/python/standards.md"
 "src/lean_sdd/template_overrides/common-standards.md" = "lean_sdd_templates/common/CODING_STANDARDS.md"
+"docs/configuration.md" = "lean_sdd_templates/common/.agents/docs/configuration.md"
+"docs/profiles.md" = "lean_sdd_templates/common/.agents/docs/profiles.md"
+"docs/diagnostics.md" = "lean_sdd_templates/common/.agents/docs/diagnostics.md"
+"docs/validation.md" = "lean_sdd_templates/common/.agents/docs/validation.md"
 ".agents/README.md" = "lean_sdd_templates/common/.agents/README.md"
 ".agents/.env.example" = "lean_sdd_templates/common/.agents/.env.example"
 ".agents/github-mcp-contract.md" = "lean_sdd_templates/common/.agents/github-mcp-contract.md"
@@ -63,6 +71,7 @@ only-include = [
     "docs/profiles.md",
     "docs/diagnostics.md",
     "docs/validation.md",
+    "docs/foundation-acceptance.md",
     "AGENTS.md",
     "CONSTITUTION.md",
     "CODING_STANDARDS.md",
@@ -91,7 +100,10 @@ only-include = [
     ".agents/skills/update-issue/scripts/close-issue.sh",
     ".agents/skills/update-issue/scripts/comment-issue.sh",
 ]
-exclude = ["**/__pycache__", "**/*.pyc"]
+exclude = [
+    "**/__pycache__", "**/*.pyc", "**/.env*", "!**/.env.example",
+    "**/.pytest_cache", "**/.mypy_cache", "**/.ruff_cache",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

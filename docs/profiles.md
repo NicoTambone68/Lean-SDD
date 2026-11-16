@@ -8,8 +8,9 @@ metadata, arbitrary import, or command execution during composition.
 
 Fresh initialization uses `resolve_bundle()` for the composed payload and writes
 schema-2 installation records. `template_files()` remains the legacy Python
-adapter for schema-1 reinitialization and diagnostics; its bytes and historical
-records are unchanged. Resource resolution itself does not install files or
+adapter for schema-1 reinitialization and diagnostics; its layout remains readable and historical
+records are unchanged. Current reference bytes follow the CLI release; they are
+never written over historical installations. Resource resolution itself does not install files or
 rewrite records. See the [configuration contract](configuration.md) for selection,
 configuration ownership, and repeat-initialization behavior.
 
@@ -38,13 +39,18 @@ enter the distributions; credentials and live acceptance evidence stay excluded.
 | Asset | Authoritative source | Installed destination |
 | --- | --- | --- |
 | Constitution | root `CONSTITUTION.md`, unchanged | `CONSTITUTION.md` |
-| Workflow and six core skills | root `AGENTS.md` and explicitly listed `.agents/` assets, unchanged | original paths |
+| Workflow and six core skills | root `AGENTS.md` and explicitly listed `.agents/` assets | original paths |
 | Shared standards | `src/lean_sdd/template_overrides/common-standards.md` | `CODING_STANDARDS.md` in composed bundles |
 | Python rules | root `CODING_STANDARDS.md`, unchanged | `.agents/standards/python.md` in composed bundles; `CODING_STANDARDS.md` in legacy output |
+| Configuration/profile/diagnostic/execution references | `docs/` sources, explicitly mapped | `.agents/docs/` |
 | Generic readiness and ignore rules | existing files under `src/lean_sdd/template_overrides/` | original `.agents/` destinations |
 
 Reusing root Python standards prevents a second normative copy from drifting.
-When installing their bytes at `.agents/standards/python.md`, the resolver changes
+The setup document also relocates exactly four `../docs/` reference links to
+installed `.agents/docs/` links, rejecting unexpected source markup. No normative
+text changes during that relocation.
+
+When installing the Python standards at `.agents/standards/python.md`, the resolver changes
 only the two Markdown links targeting `CONSTITUTION.md` and `AGENTS.md` to reach
 the same root documents through `../../`. It requires exactly one occurrence of
 each original link; unexpected source changes fail for review. The text of every
@@ -56,11 +62,11 @@ paths, sorted by profile ID. This is a fixed text substitution, not an executabl
 template language. Shared standards explicitly require reading every applicable
 profile and reporting contradictions before implementation.
 
-The bundled root workflow retains its existing Python validation commands and
-all approval/failure gates during this foundation increment. No nonexistent
-validation command is referenced. General application-validation integration
-belongs to the later workflow task; fixture-only bundles are not a supported
-non-Python installation.
+The root workflow explicitly loads shared and applicable profile standards and
+uses reviewed `lean-sdd validate .` for composed installations. This source
+repository and legacy Python installs retain the four maintenance commands.
+All approval/failure gates are shared. Inert fixture bundles demonstrate contracts;
+they are not supported non-Python installations.
 
 ## Typed metadata
 
@@ -135,9 +141,11 @@ collision checks do not prove that arbitrary prose preserves every policy.
 Profiles have no override flag: all profile replacements are rejected. The only
 compatibility adapter is `template_files()`, which deliberately chooses the
 canonical original Python standards as root `CODING_STANDARDS.md` instead of the
-new common standards template. This reproduces the original legacy payload and
-does not update an existing installation. It is not an override permission for
-profiles. A pinned manifest fixture verifies every legacy destination and hash.
+new common standards template. This preserves the legacy layout and does not update an existing installation.
+It is not an override permission for profiles. The pinned historical manifest
+protects unchanged rules/scripts; separately reviewed documentation changes and
+new reference documents belong to the new release. Doctor compares historical
+hashes to original files separately from the current release reference.
 
 Any future deliberate replacement needs its own reviewed contract and may not
 weaken shared governance. New executable template sources belong under `src/`;
@@ -163,10 +171,10 @@ shortened to remove apparent duplication.
 | 9. Packaging, Dependencies, and Compatibility | `.agents/standards/python.md`, section 9 |
 | 10. Static Quality and Performance | `.agents/standards/python.md`, section 10 |
 
-Tests compare the complete relocated Python document to the canonical source,
-and every common workflow file to its legacy bytes. Governance amendments,
-language activation in init/doctor, version-2 record writing, and migration remain
-separately scoped tasks.
+Tests compare the complete relocated Python document to the canonical source
+and common assets across legacy/composed reference bundles. Configuration-aware
+init/doctor/validate and schema-2 writing are implemented. Automatic migration,
+new languages and constitutional amendments remain separately scoped work.
 
 ## Adding a future bundled profile
 
@@ -177,3 +185,22 @@ and provide composition/failure tests. Verify links, Bash syntax when applicable
 the core skill set plus declared additions, and isolated distribution loading.
 Provide actual language-toolchain acceptance before adding a production registry
 entry. Test fixtures alone never establish supported-language status.
+
+A profile-authoring issue must name its supported platforms/runtime/toolchain,
+mandatory categories, exact commands and dependency reproducibility contract.
+Extend the static registry, strict configuration requirements and built-in
+diagnostic dispatch in `src/lean_sdd/`; metadata cannot import a plugin or execute
+a callback. Keep existing Python normative text and all common governance intact.
+Review semantic conflicts across every supported combination; structural collision
+checks cannot verify prose. Test multiple profiles per component, cross-component
+required failures, package imports, artifact composition and actual toolchain
+execution before advertising support through `languages`.
+
+The staged follow-ups are [constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10)
+and [TypeScript support #11](https://github.com/NicoTambone68/Lean-SDD/issues/11).
+Neither is delivered by the foundation. A future example, unusable until the
+TypeScript increment ships, is a Python component at `src/api/` and a TypeScript
+component at `src/worker/`, with sources inside their component-local `src/`.
+Each owns its manifests/lockfile; project-wide interface tests cover their shared
+contracts. Multiple Python components already use this layout without a new
+language. See the runnable [Python configurations](configuration.md).
