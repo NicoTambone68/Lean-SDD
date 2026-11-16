@@ -62,6 +62,7 @@ only-include = [
     "docs/configuration.md",
     "docs/profiles.md",
     "docs/diagnostics.md",
+    "docs/validation.md",
     "AGENTS.md",
     "CONSTITUTION.md",
     "CODING_STANDARDS.md",

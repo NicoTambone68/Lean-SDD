@@ -74,7 +74,7 @@ observations or that component's independent lockfile observation.
 Application scaffolding remains optional during workflow adoption, so absent
 manifests/lockfiles are advisory here. Later validation can require working
 project metadata, dependencies, tools, and existing command directories before
-it can execute a required check. A doctor warning is not an exemption from that
+it can execute a required check. See the [execution contract](validation.md). A doctor warning is not an exemption from that
 validation contract and must never be presented as a passed application check.
 Invalid mappings and missing declared component/check directories are already
 failures in doctor: the selected location must exist to inspect its setup.
