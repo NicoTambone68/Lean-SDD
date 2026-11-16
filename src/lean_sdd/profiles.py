@@ -3,6 +3,16 @@
 import re
 from dataclasses import dataclass
 
+from lean_sdd.paths import safe_relative_path
+
+
+@dataclass(frozen=True)
+class Resource:
+    """A packaged path relative to profiles/<id>/ and its installation destination."""
+
+    source: str
+    destination: str
+
 
 def valid_identifier(value: str) -> bool:
     """Accept a portable lowercase identifier of at most 64 characters."""
@@ -28,6 +38,15 @@ class Profile:
     id: str
     display_name: str
     required_checks: tuple[RequiredCheck, ...]
+    tools: tuple[str, ...] = ()
+    diagnostic: str | None = None
+    resources: tuple[Resource, ...] = ()
+    skills: tuple[str, ...] = ()
+
+    @property
+    def standards_path(self) -> str:
+        """Return the canonical destination for this profile's standards."""
+        return f".agents/standards/{self.id}.md"
 
 
 PYTHON = Profile(
@@ -39,6 +58,9 @@ PYTHON = Profile(
         RequiredCheck("format", ("uv", "run", "ruff", "format", "--check", ".")),
         RequiredCheck("types", ("uv", "run", "mypy", ".")),
     ),
+    tools=("python", "uv", "pytest", "ruff", "mypy"),
+    diagnostic="python",
+    resources=(Resource("standards.md", ".agents/standards/python.md"),),
 )
 
 
@@ -93,6 +115,7 @@ class ProfileRegistry:
                     raise ValueError("Invalid mandatory command argument tuple.")
             if profile.id == "python" and profile != PYTHON:
                 raise ValueError("The Python profile cannot replace mandatory checks.")
+            _resource_metadata(profile)
 
     def get(self, profile_id: str) -> Profile:
         """Return the named profile or reject an unsupported selection."""
@@ -103,6 +126,44 @@ class ProfileRegistry:
         if not valid_identifier(profile_id):
             raise ValueError("Invalid profile identifier.")
         raise ValueError(f"Unsupported profile: {profile_id}.")
+
+
+def _resource_metadata(profile: Profile) -> None:
+    for values in (profile.tools, profile.skills):
+        if (
+            not isinstance(values, tuple)
+            or any(not isinstance(v, str) or not valid_identifier(v) for v in values)
+            or len(set(values)) != len(values)
+        ):
+            raise ValueError("Tools and skills must be unique identifier tuples.")
+    # Keys identify known future dispatch, never an import path or callable.
+    if profile.diagnostic not in (None, "python"):
+        raise ValueError("Unknown built-in diagnostic selection.")
+    if profile.diagnostic == "python" and profile.id != "python":
+        raise ValueError("Python diagnostics belong only to the Python profile.")
+    if not isinstance(profile.resources, tuple):
+        raise ValueError("Profile resources must be an explicit tuple.")
+    destinations: set[str] = set()
+    for resource in profile.resources:
+        if (
+            not isinstance(resource, Resource)
+            or not isinstance(resource.source, str)
+            or not isinstance(resource.destination, str)
+            or not safe_relative_path(resource.source)
+            or not safe_relative_path(resource.destination)
+        ):
+            raise ValueError("Unsafe profile resource mapping.")
+        if resource.destination.casefold() in destinations:
+            raise ValueError("Duplicate profile resource destination.")
+        destinations.add(resource.destination.casefold())
+    # Contract-only fixtures from configuration parsing need no packaged assets.
+    # A composable profile, however, must declare its canonical standards file.
+    if profile.resources and profile.standards_path not in {
+        r.destination for r in profile.resources
+    }:
+        raise ValueError("Profile resources must include its standards file.")
+    if profile.skills and not profile.resources:
+        raise ValueError("Declared skills require profile resources.")
 
 
 BUILTIN_PROFILES = ProfileRegistry()

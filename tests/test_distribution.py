@@ -7,10 +7,20 @@ import re
 import subprocess
 import sys
 import tarfile
+import tomllib
 import zipfile
 from pathlib import Path
 
-from lean_sdd.templates import STATE_PATH, package_version, template_files
+import pytest
+
+from lean_sdd.templates import (
+    CORE_SKILLS,
+    STATE_PATH,
+    package_version,
+    resolve_bundle,
+    template_files,
+    template_manifest,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -31,8 +41,11 @@ def run(
     return result
 
 
-def test_bundled_links_resolve_and_scripts_parse(tmp_path: Path) -> None:
-    payload = template_files()
+@pytest.mark.parametrize("profile_bundle", [False, True])
+def test_bundled_links_resolve_and_scripts_parse(
+    tmp_path: Path, profile_bundle: bool
+) -> None:
+    payload = resolve_bundle().payload if profile_bundle else template_files()
     for name, content in payload.items():
         if name.endswith(".md"):
             for link in re.findall(r"\]\(([^)]+)\)", content.decode()):
@@ -54,7 +67,9 @@ def test_bundled_links_resolve_and_scripts_parse(tmp_path: Path) -> None:
     readiness = payload[".agents/github-workflow-acceptance.md"].decode()
     assert "NicoTambone68" not in readiness
     assert "not been established" in readiness
-    assert len([name for name in payload if name.endswith("/SKILL.md")]) == 6
+    assert {
+        name.split("/")[2] for name in payload if name.endswith("/SKILL.md")
+    } == CORE_SKILLS
 
 
 def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
@@ -75,6 +90,15 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
     wheel = next(output.glob("*.whl"))
     archive = next(output.glob("*.tar.gz"))
     payload = template_files()
+    composed = resolve_bundle()
+    mappings = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "tool"
+    ]["hatch"]["build"]["targets"]["wheel"]["force-include"]
+    packaged = {
+        destination.removeprefix("lean_sdd_templates/"): (ROOT / source).read_bytes()
+        for source, destination in mappings.items()
+    }
+    assert len(packaged) == len(mappings)
     with zipfile.ZipFile(wheel) as bundle:
         names = bundle.namelist()
         installed = {
@@ -82,12 +106,16 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
             for name in names
             if name.startswith("lean_sdd_templates/")
         }
-        assert installed == set(payload)
+        assert installed == set(packaged)
         assert not any(
             name.endswith("/.env") or "__pycache__" in name for name in names
         )
-        for name, content in payload.items():
+        for name, content in packaged.items():
             assert bundle.read(f"lean_sdd_templates/{name}") == content
+        zipped = resolve_bundle(
+            resource_root=zipfile.Path(bundle, "lean_sdd_templates/")
+        )
+        assert zipped == composed
     with tarfile.open(archive) as bundle:
         assert not any(name.endswith("/.env") for name in bundle.getnames())
         assert not any(
@@ -109,14 +137,43 @@ def test_wheel_and_sdist_install_without_checkout(tmp_path: Path) -> None:
         env,
     )
     with zipfile.ZipFile(next(rebuilt.glob("*.whl"))) as bundle:
-        for name, content in payload.items():
+        for name, content in packaged.items():
             assert bundle.read(f"lean_sdd_templates/{name}") == content
+        assert (
+            resolve_bundle(resource_root=zipfile.Path(bundle, "lean_sdd_templates/"))
+            == composed
+        )
     run(
         ["uv", "tool", "install", "--offline", "--python", sys.executable, str(wheel)],
         tmp_path,
         env,
     )
     executable = tmp_path / "bin" / ("lean-sdd.exe" if os.name == "nt" else "lean-sdd")
+    python = (
+        tmp_path
+        / "tools"
+        / "lean-sdd-cli"
+        / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    )
+    probe = run(
+        [
+            str(python),
+            "-c",
+            (
+                "import json; "
+                "from lean_sdd.templates import resolve_bundle, template_manifest; "
+                "bundle = resolve_bundle(); "
+                "print(json.dumps({'profiles':bundle.profiles, "
+                "'manifest':template_manifest(bundle.payload)}))"
+            ),
+        ],
+        tmp_path,
+        env,
+    )
+    assert json.loads(probe.stdout) == {
+        "profiles": ["python"],
+        "manifest": template_manifest(composed.payload),
+    }
     assert (
         f"lean-sdd {package_version()}"
         in run([str(executable), "--version"], tmp_path, env).stdout

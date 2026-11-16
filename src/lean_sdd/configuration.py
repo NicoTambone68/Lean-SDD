@@ -11,13 +11,13 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Literal
 
+from lean_sdd.paths import safe_relative_path
 from lean_sdd.profiles import (
     BUILTIN_PROFILES,
     PYTHON,
     ProfileRegistry,
     valid_identifier,
 )
-from lean_sdd.templates import _safe_template_path
 
 CONFIGURATION_NAME = "lean-sdd.toml"
 MAX_CONFIGURATION_BYTES = 1024 * 1024
@@ -143,7 +143,7 @@ def _supported(registry: ProfileRegistry, profile: str) -> None:
 
 
 def _path(value: object, context: str) -> PurePosixPath:
-    if not isinstance(value, str) or (value != "." and not _safe_template_path(value)):
+    if not isinstance(value, str) or (value != "." and not safe_relative_path(value)):
         raise ConfigurationError(
             f"{context}: expected a safe normalized relative path."
         )
