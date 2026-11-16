@@ -40,6 +40,12 @@ workflow and GitHub integration are independent of the application language.
 See [adapting to another language](#adapting-to-another-language) for the
 supporting configuration and documentation to review.
 
+The [component configuration contract](docs/configuration.md) defines the new
+Python API for strict profile mappings and validation-check configuration,
+including complete single-component and multi-component Python examples. This
+foundation does not yet change CLI initialization or diagnostics, execute checks,
+or add TypeScript support.
+
 Other, more sophisticated SDD tools and frameworks are available and may be
 better suited to your application, team size, or process requirements. Lean-SDD
 keeps its scope small. It borrows the principle of a project **constitution**
