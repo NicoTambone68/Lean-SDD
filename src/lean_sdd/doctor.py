@@ -28,6 +28,7 @@ from lean_sdd.templates import (
     template_files,
     template_manifest,
 )
+from lean_sdd.typescript import inspect_typescript
 
 MAX_METADATA_BYTES = 1024 * 1024
 
@@ -163,6 +164,13 @@ def _component_checks(
             )
             if registry.get(profile_id).diagnostic == "python":
                 observations = _python_checks(target, component)
+            elif registry.get(profile_id).diagnostic == "typescript":
+                observations = [
+                    Check(item.status, item.message)
+                    for item in inspect_typescript(
+                        target, component, resolved.configuration.checks
+                    )
+                ]
             else:
                 observations = [
                     Check(

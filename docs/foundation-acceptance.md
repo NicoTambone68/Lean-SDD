@@ -1,7 +1,8 @@
 # Python foundation acceptance
 
 Scope: [parent #3](https://github.com/NicoTambone68/Lean-SDD/issues/3), foundation
-increments #4–#9. Python is the only production profile. This is an evidence map,
+increments #4–#9. Python was the only production profile at foundation completion.
+Release 0.3.0 adds [TypeScript acceptance](typescript.md) separately under #11. This is an evidence map,
 not a claim of live GitHub readiness or support for future languages. Test names
 refer to this release's source distribution; execute the four maintenance checks
 to establish results for a particular checkout.
@@ -13,7 +14,7 @@ to establish results for a particular checkout.
 | 1. One shared governance layer, explicit standards, conflict handling | `test_profiles.py::test_python_rules_and_common_workflow_are_preserved`; `test_workflow_acceptance.py::test_workflow_gates_and_execution_boundary`; author review must still resolve contradictory prose. |
 | 2. Legacy Python without forced migration; multiple Python components | `test_profile_installation.py`, `test_distribution.py::test_wheel_and_sdist_install_without_checkout`; historical record bytes/timestamps remain unchanged; both artifacts execute root and multiple-component checks. |
 | 3. Strict mappings: roots, profile unions, duplicates, overlaps, paths, symlinks, cwd | `test_configuration.py`, `test_validation.py`; malformed explicit data never defaults to Python. |
-| 4. Explicit selection/reporting; TypeScript rejected | `test_profile_installation.py::test_languages_and_cli_selection`, `test_unsupported_languages_do_not_default_or_write`; isolated artifact acceptance checks the same CLI boundary. |
+| 4. Explicit selection/reporting; unknown languages rejected | `test_profile_installation.py::test_languages_and_cli_selection`, `test_unsupported_languages_do_not_default_or_write`; isolated artifact acceptance checks the same CLI boundary. |
 | 5. Dry-run, repeats, conflicts, user config, secrets, links, rollback | `test_installer.py`, `test_profile_installation.py`; distribution dry-run/repeat/ownership tests and seeded package-exclusion sentinels. |
 | 6. Schema 1/2 historical hashes and distinct diagnostic observations | `test_templates.py`, `test_doctor.py`, `test_profile_installation.py`; isolated artifact historical/current manifests, modified/missing files, unknown identity and no-migration acceptance. |
 | 7. Local, non-executing component diagnostics; no unknown-profile Python fallback | `test_doctor.py`; isolated artifact doctor and validation preflight distinguish advisory application setup from blocking failures. |
@@ -64,7 +65,7 @@ both artifact formats. This follow-up does not change the historical #9 scope.
 
 ## Deferred acceptance
 
-- [TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11): standards, real toolchain, TypeScript-only and Python/TypeScript interface acceptance. No fixture or future layout proves this support.
+- [TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11) now has separate [real-toolchain evidence](typescript.md), including ESM/CommonJS and mixed message acceptance. The original foundation fixtures alone did not establish that support.
 - Other languages, application scaffolds, dynamic/downloaded profiles, automatic migration/profile switching and dependency-based final-check selection remain out of scope.
 - Validation is Linux-only (including Linux under WSL); native Windows/macOS execution acceptance is not supplied. Owned process-group cleanup is not a sandbox; detached descendants/services are unsupported.
 - Live GitHub permissions, expected-head policy enforcement and end-to-end issue/PR/merge/closure require a separately authorized run with actual installed scripts, approvals and retained evidence. Inert tests, doctor and this matrix do not establish them. This issue does not close parent #3 automatically.

@@ -334,7 +334,7 @@ def test_invalid_configuration_never_executes(
         elif change == "bad-timeout":
             text = text.replace("timeout_seconds = 300", "timeout_seconds = inf", 1)
         elif change == "unsupported-profile":
-            text = text.replace("python", "typescript")
+            text = text.replace("python", "unsupported")
         else:
             text = text.replace('cwd = "."', 'cwd = "../outside"', 1)
         path.write_text(text, encoding="utf-8")

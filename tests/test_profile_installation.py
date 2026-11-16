@@ -99,7 +99,7 @@ def test_languages_and_cli_selection(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     assert main(["languages"]) == 0
-    assert capsys.readouterr().out == "python: Python\n"
+    assert capsys.readouterr().out == "python: Python\ntypescript: TypeScript\n"
     target = tmp_path / "new"
     assert main(["init", str(target), "--language", "python", "--dry-run"]) == 0
     output = capsys.readouterr().out
@@ -108,7 +108,7 @@ def test_languages_and_cli_selection(
     assert not target.exists()
 
 
-@pytest.mark.parametrize("language", ["typescript", "unknown", "Python"])
+@pytest.mark.parametrize("language", ["rust", "unknown", "Python"])
 def test_unsupported_languages_do_not_default_or_write(
     tmp_path: Path, language: str, capsys: pytest.CaptureFixture[str]
 ) -> None:

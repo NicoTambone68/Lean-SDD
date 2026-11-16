@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lean-sdd-cli"
-version = "0.2.1"
+version = "0.3.0"
 description = "Install an issue-driven GitHub workflow for coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -22,12 +22,15 @@ exclude = [
     "src/lean_sdd/template_overrides",
     "**/.env*", "**/__pycache__", "**/*.pyc",
     "**/.pytest_cache", "**/.mypy_cache", "**/.ruff_cache",
+    "**/node_modules", "**/.build",
 ]
 
 [tool.hatch.build.targets.wheel.force-include]
 "AGENTS.md" = "lean_sdd_templates/common/AGENTS.md"
 "CONSTITUTION.md" = "lean_sdd_templates/common/CONSTITUTION.md"
 "CODING_STANDARDS.md" = "lean_sdd_templates/profiles/python/standards.md"
+"src/lean_sdd/template_overrides/typescript-standards.md" = "lean_sdd_templates/profiles/typescript/standards.md"
+"docs/typescript.md" = "lean_sdd_templates/profiles/typescript/guide.md"
 "src/lean_sdd/template_overrides/common-standards.md" = "lean_sdd_templates/common/CODING_STANDARDS.md"
 "docs/configuration.md" = "lean_sdd_templates/common/.agents/docs/configuration.md"
 "docs/profiles.md" = "lean_sdd_templates/common/.agents/docs/profiles.md"
@@ -69,6 +72,7 @@ only-include = [
     "README.md",
     "docs/configuration.md",
     "docs/profiles.md",
+    "docs/typescript.md",
     "docs/diagnostics.md",
     "docs/validation.md",
     "docs/foundation-acceptance.md",
@@ -103,10 +107,12 @@ only-include = [
 exclude = [
     "**/__pycache__", "**/*.pyc", "**/.env*", "!**/.env.example",
     "**/.pytest_cache", "**/.mypy_cache", "**/.ruff_cache",
+    "**/node_modules", "**/.build",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = ["typescript_toolchain: opt-in real Node/npm/Python acceptance"]
 addopts = "--import-mode=importlib"
 
 [tool.ruff]

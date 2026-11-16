@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2023",
+    "types": [],
+    "rootDir": "src",
+    "outDir": "src/.build",
+    "declaration": true,
+    "noEmitOnError": true
+  },
+  "include": ["src/index.ts"]
+}

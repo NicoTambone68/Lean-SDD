@@ -1,8 +1,8 @@
 # Bundled profile resources
 
 The resource API composes shared governance and explicitly selected language
-profiles into a deterministic mapping of destination paths to bytes. Python is
-the only production profile. Extra profiles used by tests are inert fixtures,
+profiles into a deterministic mapping of destination paths to bytes. Python and
+TypeScript are production profiles. Extra profiles used by tests are inert fixtures,
 not advertised language support. There is no dynamic plugin system, downloaded
 metadata, arbitrary import, or command execution during composition.
 
@@ -27,6 +27,9 @@ common/
 profiles/
   python/
     standards.md
+  typescript/
+    standards.md
+    guide.md
 ```
 
 `pyproject.toml` maps each source explicitly to one packaged location. Runtime
@@ -42,6 +45,7 @@ enter the distributions; credentials and live acceptance evidence stay excluded.
 | Workflow and six core skills | root `AGENTS.md` and explicitly listed `.agents/` assets | original paths |
 | Shared standards | `src/lean_sdd/template_overrides/common-standards.md` | `CODING_STANDARDS.md` in composed bundles |
 | Python rules | root `CODING_STANDARDS.md`, unchanged | `.agents/standards/python.md` in composed bundles; `CODING_STANDARDS.md` in legacy output |
+| TypeScript rules and toolchain guide | explicit `src/lean_sdd/template_overrides/` and `docs/typescript.md` sources | `.agents/standards/typescript.md` and `.agents/docs/typescript.md` |
 | Configuration/profile/diagnostic/execution references | `docs/` sources, explicitly mapped | `.agents/docs/` |
 | Generic readiness and ignore rules | existing files under `src/lean_sdd/template_overrides/` | original `.agents/` destinations |
 
@@ -75,13 +79,14 @@ configuration contract, and additionally declares:
 
 - `tools`: a tuple of unique tool identifiers, describing requirements without
   checking for or launching those tools. Python declares `python`, `uv`, `pytest`,
-  `ruff`, and `mypy`; uv remains a shared workflow requirement too.
-- `diagnostic`: a built-in dispatch key, currently `python` for the Python profile
-  or `None` for inert fixtures. It is never a module name or callable. Doctor
-  dispatches Python checks at each selected component root and reports unavailable
+  `ruff`, and `mypy`; TypeScript declares `node` and `npm`. uv remains a shared
+  workflow requirement too.
+- `diagnostic`: the built-in `python` or `typescript` dispatch key, or `None`
+  for inert fixtures. It is never a module name or callable. Doctor dispatches
+  the selected profile's checks at each component root and reports unavailable
   application diagnostics for `None`. A new production diagnostic requires an
-  explicit code change and acceptance; a different profile cannot borrow Python
-  diagnostics. See the [diagnostic reference](diagnostics.md).
+  explicit code change and acceptance; a different profile cannot borrow either built-in
+  diagnostic. See the [diagnostic reference](diagnostics.md).
 - `resources`: explicit `Resource(source, destination)` values. Source paths are
   relative to packaged `profiles/<id>/`; destinations are repository-relative.
   A composable profile must include `.agents/standards/<id>.md` with nonempty UTF-8
@@ -201,9 +206,11 @@ was separately approved and incorporated in Constitution 2.0.1, preserving root
 `src/` containment. Template release 0.2.1 includes that authoritative amendment;
 existing project constitutions and installation records are not migrated.
 [TypeScript support #11](https://github.com/NicoTambone68/Lean-SDD/issues/11)
-remains deferred. A future example, unusable until that increment ships, is a
-Python component at `src/api/` and a TypeScript
-component at `src/worker/`, with sources inside their component-local `src/`.
-Each owns its manifests/lockfile; project-wide interface tests cover their shared
-contracts. Multiple Python components already use this layout without a new
-language. See the runnable [Python configurations](configuration.md).
+is included in release 0.3.0 after real Node/npm acceptance. A Python component
+at `src/api/` and a TypeScript component at `src/worker/` keep sources inside
+their component-local `src/`. Each owns its manifests/lockfile; required interface
+tests cover their shared contracts. Two TypeScript components use the same model.
+Both profiles on one component keep all nine required checks. The installed
+TypeScript profile includes `.agents/docs/typescript.md` with the supported
+runtime, package-manager and module contract. See also the
+[configuration examples](configuration.md).

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from lean_sdd.profiles import PYTHON, TYPESCRIPT, ProfileRegistry
 from lean_sdd.templates import (
     CORE_SKILLS,
     STATE_PATH,
@@ -42,11 +43,18 @@ def run(
     return result
 
 
-@pytest.mark.parametrize("profile_bundle", [False, True])
+@pytest.mark.parametrize(
+    "profiles", [(), ("python",), ("typescript",), ("python", "typescript")]
+)
 def test_bundled_links_resolve_and_scripts_parse(
-    tmp_path: Path, profile_bundle: bool
+    tmp_path: Path, profiles: tuple[str, ...]
 ) -> None:
-    payload = resolve_bundle().payload if profile_bundle else template_files()
+    registry = ProfileRegistry((PYTHON, TYPESCRIPT))
+    payload = (
+        resolve_bundle(profiles, registry=registry).payload
+        if profiles
+        else template_files()
+    )
     for name, content in payload.items():
         if name.endswith(".md"):
             for link in re.findall(r"\]\(([^)]+)\)", content.decode()):
@@ -109,6 +117,8 @@ def test_wheel_and_sdist_install_without_checkout(
                     ".pytest_cache",
                     ".mypy_cache",
                     ".ruff_cache",
+                    "node_modules",
+                    ".build",
                 ),
             )
         else:
@@ -139,6 +149,10 @@ def test_wheel_and_sdist_install_without_checkout(
     archive = next(output.glob("*.tar.gz"))
     payload = template_files()
     composed = resolve_bundle()
+    typescript_registry = ProfileRegistry((PYTHON, TYPESCRIPT))
+    typescript_bundle = resolve_bundle(
+        ("python", "typescript"), registry=typescript_registry
+    )
     mappings = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
         "tool"
     ]["hatch"]["build"]["targets"]["wheel"]["force-include"]
@@ -165,6 +179,14 @@ def test_wheel_and_sdist_install_without_checkout(
             resource_root=zipfile.Path(bundle, "lean_sdd_templates/")
         )
         assert zipped == composed
+        assert (
+            resolve_bundle(
+                ("python", "typescript"),
+                registry=typescript_registry,
+                resource_root=zipfile.Path(bundle, "lean_sdd_templates/"),
+            )
+            == typescript_bundle
+        )
     with tarfile.open(archive) as bundle:
         for member in bundle.getmembers():
             if member.isfile():
@@ -199,6 +221,14 @@ def test_wheel_and_sdist_install_without_checkout(
             resolve_bundle(resource_root=zipfile.Path(bundle, "lean_sdd_templates/"))
             == composed
         )
+        assert (
+            resolve_bundle(
+                ("python", "typescript"),
+                registry=typescript_registry,
+                resource_root=zipfile.Path(bundle, "lean_sdd_templates/"),
+            )
+            == typescript_bundle
+        )
     selected_wheel = wheel if artifact == "wheel" else next(rebuilt.glob("*.whl"))
     run(
         [
@@ -219,6 +249,25 @@ def test_wheel_and_sdist_install_without_checkout(
         / "tools"
         / "lean-sdd-cli"
         / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    )
+    typescript_probe = run(
+        [
+            str(python),
+            "-c",
+            (
+                "import json; "
+                "from lean_sdd.profiles import PYTHON, TYPESCRIPT, ProfileRegistry; "
+                "from lean_sdd.templates import resolve_bundle, template_manifest; "
+                "bundle = resolve_bundle(('python','typescript'), "
+                "registry=ProfileRegistry((PYTHON,TYPESCRIPT))); "
+                "print(json.dumps(template_manifest(bundle.payload)))"
+            ),
+        ],
+        tmp_path,
+        env,
+    )
+    assert json.loads(typescript_probe.stdout) == template_manifest(
+        typescript_bundle.payload
     )
     probe = run(
         [
@@ -248,13 +297,46 @@ def test_wheel_and_sdist_install_without_checkout(
     assert "Profiles: python" in dry.stdout
     assert not dry_target.exists()
     unsupported = run(
-        [str(executable), "init", str(dry_target), "--language", "typescript"],
+        [str(executable), "init", str(dry_target), "--language", "rust"],
         tmp_path,
         env,
         expected=1,
     )
     assert "Unsupported profile" in unsupported.stderr
     assert not dry_target.exists()
+    typescript_target = tmp_path / "typescript project"
+    dry_typescript = run(
+        [
+            str(executable),
+            "init",
+            str(typescript_target),
+            "--language",
+            "typescript",
+            "--dry-run",
+        ],
+        tmp_path,
+        env,
+    )
+    assert "Profiles: typescript" in dry_typescript.stdout
+    assert not typescript_target.exists()
+    run(
+        [str(executable), "init", str(typescript_target), "--language", "typescript"],
+        tmp_path,
+        env,
+    )
+    typescript_state = json.loads((typescript_target / STATE_PATH).read_text())
+    assert typescript_state["profiles"] == ["typescript"]
+    assert (typescript_target / ".agents/standards/typescript.md").is_file()
+    assert not (typescript_target / ".agents/standards/python.md").exists()
+    assert not (typescript_target / "package.json").exists()
+    assert not (typescript_target / "src").exists()
+    typescript_record = (typescript_target / STATE_PATH).read_bytes()
+    run([str(executable), "init", str(typescript_target)], tmp_path, env)
+    assert (typescript_target / STATE_PATH).read_bytes() == typescript_record
+    missing_setup = run(
+        [str(executable), "validate", str(typescript_target)], tmp_path, env, expected=1
+    )
+    assert "Missing package.json" in missing_setup.stderr
     target = tmp_path / "fresh project"
     run([str(executable), "init", str(target)], tmp_path, env)
     assert (target / STATE_PATH).is_file()
@@ -269,7 +351,8 @@ def test_wheel_and_sdist_install_without_checkout(
         == hashlib.sha256((target / "lean-sdd.toml").read_bytes()).hexdigest()
     )
     assert (
-        run([str(executable), "languages"], tmp_path, env).stdout == "python: Python\n"
+        run([str(executable), "languages"], tmp_path, env).stdout
+        == "python: Python\ntypescript: TypeScript\n"
     )
     repeated = run(
         [str(executable), "init", str(target), "--language", "python"], tmp_path, env

@@ -16,6 +16,7 @@ from lean_sdd.paths import safe_relative_path
 from lean_sdd.profiles import (
     BUILTIN_PROFILES,
     PYTHON,
+    TYPESCRIPT_DEFAULT_SCRIPTS,
     ProfileRegistry,
     valid_identifier,
 )
@@ -265,6 +266,20 @@ def _required_checks(config: Configuration, registry: ProfileRegistry) -> None:
                         "cannot be replaced."
                     )
 
+                if profile_id == "typescript":
+                    # Import locally: metadata inspection depends on these typed
+                    # contracts, while configuration only needs the argv adapter.
+                    from lean_sdd.typescript import npm_script
+
+                    if (
+                        npm_script(matches[0].argv) is None
+                        or matches[0].cwd != component.path
+                    ):
+                        raise ConfigurationError(
+                            f"{context}: required checks use npm run <script> "
+                            "at the component root."
+                        )
+
 
 def parse_configuration(
     content: str, *, registry: ProfileRegistry = BUILTIN_PROFILES
@@ -406,6 +421,35 @@ def _legacy_python() -> Configuration:
     )
 
 
+def _default_configuration(language: str, registry: ProfileRegistry) -> Configuration:
+    _supported(registry, language)
+    if language == "python":
+        return _legacy_python()
+    if language != "typescript":
+        raise ConfigurationError(
+            "This profile requires explicit component/check configuration."
+        )
+    checks = tuple(
+        Check(
+            f"typescript-{category}",
+            "component",
+            "root",
+            language,
+            category,
+            PurePosixPath("."),
+            ("npm", "run", script),
+            True,
+            DEFAULT_TIMEOUT_SECONDS,
+        )
+        for category, script in TYPESCRIPT_DEFAULT_SCRIPTS
+    )
+    return Configuration(
+        1,
+        (Component("root", PurePosixPath("."), (language,)),),
+        tuple(sorted(checks, key=lambda check: check.name)),
+    )
+
+
 def resolve_configuration(
     root: Path,
     *,
@@ -449,11 +493,6 @@ def resolve_configuration(
                 "Language conflicts with the explicit component mapping."
             )
         return ResolvedConfiguration(config, "explicit")
-    if language not in (None, "python"):
-        raise ConfigurationError(
-            "This profile requires explicit component/check configuration."
-        )
-    _supported(registry, "python")
     origin: Literal["installed-legacy", "fresh-default", "language"] = (
         "installed-legacy"
         if installed is not None
@@ -461,25 +500,28 @@ def resolve_configuration(
         if language
         else "fresh-default"
     )
-    config = _legacy_python()
+    config = _default_configuration(language or "python", registry)
     validate_directories(config, root)
     return ResolvedConfiguration(config, origin)
 
 
-def default_configuration_bytes() -> bytes:
-    """Render the fixed root Python plan as schema-1 TOML, without execution.
+def default_configuration_bytes(
+    language: str = "python", *, registry: ProfileRegistry = BUILTIN_PROFILES
+) -> bytes:
+    """Render a built-in single-root plan as schema-1 TOML, without execution.
 
     Only the built-in default is serialized. User-owned configurations are never
     round-tripped or rewritten by initialization.
     """
+    configuration = _default_configuration(language, registry)
     lines = [
         "schema_version = 1",
         "",
         "[components.root]",
         'path = "."',
-        'profiles = ["python"]',
+        f"profiles = {json.dumps([language])}",
     ]
-    for check in _legacy_python().checks:
+    for check in configuration.checks:
         lines.extend(
             [
                 "",
@@ -487,7 +529,7 @@ def default_configuration_bytes() -> bytes:
                 f"name = {json.dumps(check.name)}",
                 'scope = "component"',
                 'component = "root"',
-                'profile = "python"',
+                f"profile = {json.dumps(language)}",
                 f"category = {json.dumps(check.category)}",
                 'cwd = "."',
                 f"argv = {json.dumps(check.argv)}",
