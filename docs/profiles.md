@@ -153,8 +153,8 @@ new reference documents belong to the new release. Doctor compares historical
 hashes to original files separately from the current release reference.
 
 Any future deliberate replacement needs its own reviewed contract and may not
-weaken shared governance. New executable template sources belong under `src/`;
-the established Bash workflow assets are reused, not copied per language.
+weaken shared governance. Application scripts belong under repository-root
+`src/`. Profiles reuse the core Bash workflow tools under `.agents/`.
 
 ## Python rule traceability
 
@@ -184,9 +184,11 @@ new languages and constitutional amendments remain separately scoped work.
 ## Adding a future bundled profile
 
 Define its typed requirements, approved standards, tools, diagnostic contract,
-explicit resource mappings, and additional skill declarations. Store new template
-sources under `src/`, add each asset to the wheel mappings and sdist allowlist,
-and provide composition/failure tests. Verify links, Bash syntax when applicable,
+explicit resource mappings, and additional skill declarations. Keep dedicated
+agent workflow tools, including new skill entry points and shared helpers, under
+repository-root `.agents/`. Store other new profile template sources under
+`src/`. Add each asset to the wheel mappings and sdist allowlist and provide
+composition/failure tests. Verify links, Bash syntax when applicable,
 the core skill set plus declared additions, and isolated distribution loading.
 Provide actual language-toolchain acceptance before adding a production registry
 entry. Test fixtures alone never establish supported-language status.

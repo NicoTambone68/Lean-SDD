@@ -1,8 +1,8 @@
 # Python Project Constitution
 
-Version: 2.0.1
+Version: 2.0.2
 Ratified: 2026-08-17
-Last amended: 2026-11-16
+Last amended: 2026-11-20
 
 ## Purpose and Authority
 
@@ -61,9 +61,11 @@ services, or mutate persistent state. Resource ownership and lifetime MUST be
 clear. Concurrent work MUST define ownership of shared state and its
 synchronization, cancellation, and shutdown behavior.
 
-Project source MUST remain under repository root `src/`, including application
-and runtime code and generated application or contract code. Executable scripts
-MUST NOT be exempted from this source boundary.
+Application and runtime source, including executable application scripts and
+generated application or contract code, MUST remain under repository-root
+`src/`. Application logic MUST NOT be placed outside repository-root `src/`.
+Project-provided tools dedicated to the agent workflow, including their executable
+entry points and shared helpers, MUST live under repository-root `.agents/`.
 
 A single component rooted at `.` MUST keep its application source under repository
 root `src/`. Multiple components MAY be rooted beneath that directory, for example
@@ -182,6 +184,11 @@ Constitution versions follow semantic versioning:
 Every amendment MUST update the version and last-amended date.
 
 ### Amendment Record
+
+- **2.0.2 — 2026-11-20:** Clarified Principle III to classify executable code by
+  purpose. The CLI and other application logic belong under `src/`. Dedicated
+  agent workflow tools belong under `.agents/`, where maintainers and agents
+  can find the same entry points in this repository and in initialized projects.
 
 - **2.0.1 — 2026-11-16:** Explicitly approved clarification of Principle III for
   component roots and component-local source roots beneath repository root
