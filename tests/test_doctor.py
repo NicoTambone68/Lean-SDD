@@ -103,6 +103,45 @@ def test_invalid_install_record_is_not_interpreted_as_paths(tmp_path: Path) -> N
     assert "Invalid installation record" in checks[0].message
 
 
+@pytest.mark.usefixtures("local_tools")
+@pytest.mark.parametrize("schema", [1, 2])
+@pytest.mark.parametrize("name", [".env", ".agents/.env.local"])
+def test_doctor_rejects_private_dotenv_before_opening_recorded_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    schema: int,
+    name: str,
+) -> None:
+    record = tmp_path / STATE_PATH
+    record.parent.mkdir()
+    payload = {"ordinary.md": b"ordinary"}
+    (tmp_path / "ordinary.md").write_bytes(payload["ordinary.md"])
+    (tmp_path / name).write_bytes(b"synthetic fixture content")
+    valid_record = (
+        installation_state(payload)
+        if schema == 1
+        else profile_installation_state(
+            payload,
+            template_version="0.0.0",
+            identity=InstallationIdentity(("retired",), "configured"),
+        )
+    )
+    state = json.loads(valid_record)
+    state["files"][name] = "a" * 64
+    original = json.dumps(state).encode("utf-8")
+    record.write_bytes(original)
+    modified = record.stat().st_mtime_ns
+    with guard_doctor_reads(monkeypatch, tmp_path / "ordinary.md", tmp_path / name):
+        assert main(["doctor", str(tmp_path)]) == 1
+    output = capsys.readouterr()
+    assert "FAIL: Invalid installation record: Private dotenv paths" in output.out
+    assert repr(name) in output.out
+    assert "synthetic fixture content" not in output.out + output.err
+    assert record.read_bytes() == original
+    assert record.stat().st_mtime_ns == modified
+
+
 def test_missing_prerequisites_fail_without_network(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -698,8 +737,14 @@ def test_unavailable_historical_profile_still_reports_modified_and_missing_asset
     tmp_path: Path,
 ) -> None:
     (tmp_path / "original.md").write_bytes(b"original")
-    payload = {"original.md": b"original", "missing.md": b"missing"}
+    example = ".agents/.env.example"
+    payload = {
+        "original.md": b"original",
+        "missing.md": b"missing",
+        example: b"example",
+    }
     (tmp_path / STATE_PATH).parent.mkdir()
+    (tmp_path / example).write_bytes(payload[example])
     (tmp_path / STATE_PATH).write_bytes(
         profile_installation_state(
             payload,
@@ -715,6 +760,11 @@ def test_unavailable_historical_profile_still_reports_modified_and_missing_asset
     )
     assert any(
         c.status == "WARN" and "Locally modified template: 'original.md'" in c.message
+        for c in checks
+    )
+    assert any(
+        c.status == "PASS"
+        and f"Installed template matches recorded hash: {example!r}" in c.message
         for c in checks
     )
     assert any(
@@ -744,6 +794,39 @@ def installation_snapshot(root: Path) -> dict[str, tuple[bytes | None, int, int,
             metadata.st_ctime_ns,
         )
     return result
+
+
+@contextmanager
+def guard_doctor_reads(
+    monkeypatch: pytest.MonkeyPatch, *blocked_paths: Path
+) -> Iterator[None]:
+    original_open = Path.open
+
+    @contextmanager
+    def read_only(
+        self: Path,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> Iterator[BinaryIO | TextIO]:
+        assert self.name != ".env" and self not in blocked_paths, (
+            f"Unexpected read of {self.name!r}"
+        )
+        assert mode in ("r", "rb"), "Doctor opened a file for writing"
+        with (
+            original_open(self, "rb", buffering)
+            if mode == "rb"
+            else original_open(self, "r", buffering, encoding, errors, newline)
+        ) as stream:
+            yield stream
+            if self.name == "uv.lock":
+                assert stream.tell() <= 1, "Lockfile observation read past the prefix"
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "open", read_only)
+        yield
 
 
 def test_diagnostics_never_load_secrets_execute_project_code_or_contact_network(
@@ -783,29 +866,8 @@ def test_diagnostics_never_load_secrets_execute_project_code_or_contact_network(
     monkeypatch.setenv("GIT_TRACE2_EVENT", str(marker))
     monkeypatch.setenv("GITHUB_TOKEN", "secret-value-must-not-be-printed")
     before = installation_snapshot(tmp_path)
-    original_open = Path.open
     original_run = subprocess.run
     calls: list[tuple[str, ...]] = []
-
-    @contextmanager
-    def read_only(
-        self: Path,
-        mode: str = "r",
-        buffering: int = -1,
-        encoding: str | None = None,
-        errors: str | None = None,
-        newline: str | None = None,
-    ) -> Iterator[BinaryIO | TextIO]:
-        assert self.name != ".env", "Doctor loaded a secret file"
-        assert mode in ("r", "rb"), "Doctor opened a file for writing"
-        with (
-            original_open(self, "rb", buffering)
-            if mode == "rb"
-            else original_open(self, "r", buffering, encoding, errors, newline)
-        ) as stream:
-            yield stream
-            if self.name == "uv.lock":
-                assert stream.tell() <= 1, "Lockfile observation read past the prefix"
 
     def observed_run(
         arguments: list[str],
@@ -848,8 +910,7 @@ def test_diagnostics_never_load_secrets_execute_project_code_or_contact_network(
     def no_network(*args: object, **kwargs: object) -> None:
         pytest.fail("Doctor attempted network access")
 
-    with monkeypatch.context() as patch:
-        patch.setattr(Path, "open", read_only)
+    with guard_doctor_reads(monkeypatch), monkeypatch.context() as patch:
         patch.setattr(subprocess, "run", observed_run)
         patch.setattr(socket, "create_connection", no_network)
         patch.setattr(socket.socket, "connect", no_network)

@@ -13,6 +13,10 @@ Doctor reports these concerns separately:
 1. **Record validity.** Read at most 1,000,000 bytes of regular UTF-8 JSON from
    `.agents/lean-sdd-install.json`, rejecting unsafe paths and invalid schemas.
    Versions 1 and 2 are supported independently of the current profile catalog.
+   Both schemas reject a recorded path if any component is named `.env` or
+   starts with `.env.`, except for `.env.example`. Doctor reports an invalid
+   record before opening any listed file. The shipped `.agents/.env.example`
+   remains eligible for integrity checks.
    The report identifies schema and installed profiles. Without a valid record,
    doctor cannot select an installed profile or perform component diagnostics;
    it still reports shared workflow prerequisites.

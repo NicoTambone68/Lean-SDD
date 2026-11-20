@@ -1,6 +1,7 @@
 """Validate installation records independently of the installed CLI release."""
 
 import json
+from collections.abc import Callable
 
 import pytest
 
@@ -120,6 +121,36 @@ def profile_record(**changes: object) -> str:
     }
     state.update(changes)
     return record(**state)
+
+
+@pytest.mark.parametrize(
+    "make_record", [record, profile_record], ids=["schema1", "schema2"]
+)
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".env",
+        "nested/.env.local",
+        ".env.example.local",
+        ".env/notes",
+        "nested/.env.private/notes",
+    ],
+)
+def test_records_reject_private_dotenv_components(
+    make_record: Callable[..., str], path: str
+) -> None:
+    with pytest.raises(ValueError, match="Private dotenv paths"):
+        parse_installation_state(make_record(files={path: "a" * 64}))
+
+
+@pytest.mark.parametrize(
+    "make_record", [record, profile_record], ids=["schema1", "schema2"]
+)
+def test_records_accept_dotenv_examples_and_historical_files(
+    make_record: Callable[..., str],
+) -> None:
+    files = {".agents/.env.example": "a" * 64, "retired/standards.md": "b" * 64}
+    assert parse_installation_state(make_record(files=files)).files == files
 
 
 @pytest.mark.parametrize(

@@ -108,7 +108,7 @@ uv tool install .
 ```
 
 Both install the `lean-sdd` command. To install a wheel you have built, use
-`uv tool install /path/to/lean_sdd-0.3.4-py3-none-any.whl`. Run
+`uv tool install /path/to/lean_sdd-0.3.5-py3-none-any.whl`. Run
 `lean-sdd --version` to check the installed version. If the executable
 directory is missing from your PATH, run `uv tool update-shell` and restart
 your shell. If uv reports that a previous checkout installation owns the

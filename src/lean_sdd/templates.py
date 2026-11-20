@@ -103,6 +103,13 @@ def _invalid_json_constant(value: str) -> NoReturn:
     raise ValueError(f"Installation record is not valid JSON: {value}.")
 
 
+def _contains_private_dotenv(name: str) -> bool:
+    return any(
+        part == ".env" or (part.startswith(".env.") and part != ".env.example")
+        for part in PurePosixPath(name).parts
+    )
+
+
 def parse_installation_state(content: str) -> InstallationRecord:
     """Validate schema v1/v2 JSON without accessing recorded paths or releases.
 
@@ -138,6 +145,10 @@ def parse_installation_state(content: str) -> InstallationRecord:
     for name, digest in manifest.items():
         if not _safe_template_path(name):
             raise ValueError(f"Unsafe installation record path: {name!r}.")
+        if _contains_private_dotenv(name):
+            raise ValueError(
+                f"Private dotenv paths cannot be recorded as installed files: {name!r}."
+            )
         if (
             not isinstance(digest, str)
             or re.fullmatch(r"[0-9a-fA-F]{64}", digest) is None
@@ -181,11 +192,14 @@ def package_version() -> str:
 
 
 def _asset_path(name: str) -> bool:
-    if not _safe_template_path(name) or name == STATE_PATH:
+    if (
+        not _safe_template_path(name)
+        or name == STATE_PATH
+        or _contains_private_dotenv(name)
+    ):
         return False
     return all(
-        part not in {".git", ".venv", "__pycache__", ".env"}
-        and not (part.startswith(".env.") and part != ".env.example")
+        part not in {".git", ".venv", "__pycache__"}
         and not part.endswith((".pyc", ".pyo"))
         for part in PurePosixPath(name).parts
     )
