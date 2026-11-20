@@ -29,9 +29,11 @@ An empty string body is valid and remains empty; a missing body is an error.
 Return the full body without truncation. Treat values as data, never shell code.
 
 After implementation approval, perform a fresh read and use it as the complete
-authoritative specification. Revalidate the constitution. If the fresh body does
-not specify enough work to implement safely, clarify the missing requirement;
-do not substitute a remembered plan. A nonzero exit blocks dependent operations.
+authoritative specification. Follow the [root workflow](../../../AGENTS.md#constitution-and-scope)
+to review the constitution, shared and applicable profile standards, component
+mappings, affected interfaces, and required checks. If the fresh body is
+insufficient, clarify the missing requirement before implementation. A nonzero
+exit blocks dependent operations.
 See [the issue and branch contract](../../github-issue-contract.md).
 
 ## Successful handoff example

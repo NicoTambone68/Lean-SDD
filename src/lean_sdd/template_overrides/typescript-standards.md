@@ -1,10 +1,10 @@
 # TypeScript Coding Standards
 
-These rules supplement [shared standards](../../CODING_STANDARDS.md), the
-[constitution](../../CONSTITUTION.md) and [root workflow](../../AGENTS.md).
+These rules supplement [shared standards](common-standards.md), the
+[constitution](../../../CONSTITUTION.md) and [root workflow](../../../AGENTS.md).
 Read all applicable profiles for a component and every affected shared interface.
 Conflicting standards block implementation. No profile replaces shared rules or
-removes another profile's checks. See the [toolchain contract](../docs/typescript.md).
+removes another profile's checks. See the [toolchain contract](../../../docs/typescript.md).
 
 ## Contracts and types
 
