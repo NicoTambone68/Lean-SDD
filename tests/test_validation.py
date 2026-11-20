@@ -62,9 +62,7 @@ def check_text(
     return text
 
 
-def fixture_project(
-    root: Path, checks: str, *, profiles: tuple[str, ...] = ("fixture",)
-) -> None:
+def write_fixture_record(root: Path, profiles: tuple[str, ...]) -> None:
     root.mkdir(parents=True, exist_ok=True)
     standards = {REGISTRY.get(name).standards_path: b"inert" for name in profiles}
     for name, content in standards.items():
@@ -78,6 +76,12 @@ def fixture_project(
             identity=InstallationIdentity(profiles, "configured"),
         )
     )
+
+
+def fixture_project(
+    root: Path, checks: str, *, profiles: tuple[str, ...] = ("fixture",)
+) -> None:
+    write_fixture_record(root, profiles)
     (root / "lean-sdd.toml").write_text(
         'schema_version=1\n[components.app]\npath="."\n'
         f"profiles={json.dumps(profiles)}\n" + checks,
@@ -341,6 +345,60 @@ def test_multiple_profiles_on_one_component_each_run_their_obligations(
     assert [(r.check.profile, r.status) for r in result.checks] == [
         ("fixture", "passed"),
         ("second", "failed"),
+    ]
+
+
+@pytest.mark.parametrize("api_exit", [0, 7], ids=["all-pass", "required-failure"])
+def test_distinct_profiles_on_separate_components(
+    tmp_path: Path, api_exit: int
+) -> None:
+    write_fixture_record(tmp_path, ("fixture", "second"))
+    log = tmp_path / "directories.log"
+    command = python_command(
+        "import sys\n"
+        "from pathlib import Path\n"
+        "with open(sys.argv[1], 'a', encoding='utf-8') as log:\n"
+        "    print(Path.cwd(), file=log)\n"
+        "sys.exit(int(sys.argv[2]))\n"
+    ) + [str(log)]
+    components = "schema_version=1\n"
+    checks = check_text(
+        "z-integration", command + ["0"], component=None, category="integration"
+    )
+    for component, profile, exit_code in (
+        ("worker", "second", 0),
+        ("api", "fixture", api_exit),
+    ):
+        root = f"src/{component}"
+        (tmp_path / root).mkdir(parents=True)
+        components += (
+            f'[components.{component}]\npath="{root}"\nprofiles=["{profile}"]\n'
+        )
+        checks += check_text(
+            f"{component}-tests",
+            command + [str(exit_code)],
+            component=component,
+            profile=profile,
+            cwd=root,
+        )
+    (tmp_path / "lean-sdd.toml").write_text(components + checks, encoding="utf-8")
+
+    plan = prepare_validation(tmp_path, registry=REGISTRY, environment={})
+    assert not plan.problems
+    result = run_validation(plan)
+    assert result.exit_code == (1 if api_exit else 0)
+    assert [
+        (r.check.name, r.check.component, r.check.profile, r.status, r.returncode)
+        for r in result.checks
+    ] == [
+        ("api-tests", "api", "fixture", "failed" if api_exit else "passed", api_exit),
+        ("worker-tests", "worker", "second", "passed", 0),
+        ("z-integration", None, None, "passed", 0),
+    ]
+    assert log.read_text(encoding="utf-8").splitlines() == [
+        str(tmp_path / "src/api"),
+        str(tmp_path / "src/worker"),
+        str(tmp_path),
     ]
 
 
