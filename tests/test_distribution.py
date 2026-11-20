@@ -73,9 +73,6 @@ def test_bundled_links_resolve_and_scripts_parse(
             )
             assert result.returncode == 0, name
     assert not any(name.endswith("/.env") for name in payload)
-    readiness = payload[".agents/github-workflow-acceptance.md"].decode()
-    assert "NicoTambone68" not in readiness
-    assert "not been established" in readiness
     assert {
         name.split("/")[2] for name in payload if name.endswith("/SKILL.md")
     } == CORE_SKILLS
@@ -129,7 +126,7 @@ def test_wheel_and_sdist_install_without_checkout(
         ".env",
         ".agents/.env",
         ".agents/live-evidence.json",
-        ".agents/github-workflow-acceptance.md",
+        ".agents/local-notes.md",
         "local-result.json",
         "src/lean_sdd/.env.local",
         "tests/.env.private",
@@ -197,8 +194,7 @@ def test_wheel_and_sdist_install_without_checkout(
         assert any(name.endswith("/.agents/.env.example") for name in bundle.getnames())
         assert not any(name.endswith("/.env") for name in bundle.getnames())
         assert not any(
-            name.endswith("/.agents/github-workflow-acceptance.md")
-            for name in bundle.getnames()
+            name.endswith("/.agents/local-notes.md") for name in bundle.getnames()
         )
     rebuilt = tmp_path / "rebuilt"
     run(
@@ -346,9 +342,8 @@ def test_wheel_and_sdist_install_without_checkout(
     assert state["schema_version"] == 2
     assert state["profiles"] == ["python"]
     assert state["configuration_mode"] == "configured"
-    assert (
-        state["files"]["lean-sdd.toml"]
-        == hashlib.sha256((target / "lean-sdd.toml").read_bytes()).hexdigest()
+    assert state["files"] == template_manifest(
+        {**composed.payload, "lean-sdd.toml": (target / "lean-sdd.toml").read_bytes()}
     )
     assert (
         run([str(executable), "languages"], tmp_path, env).stdout

@@ -89,9 +89,8 @@ Bash skills perform individual operations. All GitHub service operations use
 the configured official GitHub MCP server; local Git handles branches, commits,
 fetching, pushing, and synchronization with separate Git credentials.
 
-**Readiness:** the bundled acceptance record reports an offline candidate with
-live end-to-end acceptance still pending. The presence of the scripts does not
-establish production readiness. See [acceptance evidence](.agents/github-workflow-acceptance.md).
+Before using the workflow in a new project, follow the
+[setup and readiness guide](.agents/README.md#validation-and-readiness).
 
 ## Install the CLI
 
@@ -105,7 +104,7 @@ lean-sdd --version
 
 If the executable directory is not on your PATH, run `uv tool update-shell`
 and restart your shell. A built wheel can also be installed with
-`uv tool install /path/to/lean_sdd_cli-0.3.0-py3-none-any.whl`.
+`uv tool install /path/to/lean_sdd_cli-0.3.1-py3-none-any.whl`.
 The package has not been published to PyPI; installation by the bare name
 `lean-sdd-cli` is not an advertised installation method yet.
 
@@ -271,7 +270,6 @@ The repository contains the installer and the authoritative workflow files:
     ├── .env.example               # non-secret configuration template
     ├── github-mcp-contract.md
     ├── github-issue-contract.md
-    ├── github-workflow-acceptance.md
     ├── lib/                      # shared Bash MCP and GitHub helpers
     └── skills/
         ├── list-repositories/
@@ -291,9 +289,7 @@ application manages its own Python environment separately.
 An adopting Python project additionally supplies its application code under
 `src/`, tests, `pyproject.toml`, and dependency lockfile. Those application and
 test artifacts are not generated in the target by the installer. The tests in
-this repository exercise the installer itself. Historical contract evidence
-remains explicitly labeled; installed projects receive a fresh readiness
-checklist instead of this repository's historical acceptance record.
+this repository exercise the installer itself.
 
 ## Python project management with uv
 
@@ -639,10 +635,8 @@ The package exposes `lean-sdd` through the `lean_sdd.cli:main` entry point.
 Hatchling's explicit file mappings in `pyproject.toml` bundle the authoritative
 root documents and `.agents/` files as the `lean_sdd_templates` resource namespace.
 The CLI reads those installed resources without requiring a source checkout.
-The small files under `src/lean_sdd/template_overrides/` provide the installed
-readiness checklist and local ignore rules. The build uses a file allowlist,
-not a recursive copy of local `.agents/` state; update that list when adding a
-workflow asset.
+The build uses an explicit allowlist for workflow assets. Update the mappings
+when adding an asset.
 
 After editing template files, refresh the editable installation's bundled
 resources with `uv sync --reinstall-package lean-sdd-cli` before testing.
@@ -662,14 +656,6 @@ Upgrading the CLI does not update previously initialized projects automatically.
 For composed applications, use reviewed `lean-sdd validate .` with all required
 component/project checks. For this repository, run the four maintenance commands.
 For Bash changes, include syntax checks and relevant deterministic operational tests.
-
-The [acceptance record](.agents/github-workflow-acceptance.md) describes offline
-fixtures from the original port, including simulated MCP responses and local
-Git repositories. Those test files are not present in this bundle, so their
-historical results must not be described as a test run of this checkout.
-Offline checks also cannot prove live permissions, server behavior, or real
-human approval pauses. Live acceptance is side-effecting and requires explicit
-authorization.
 
 Detailed contracts:
 

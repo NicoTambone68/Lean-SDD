@@ -84,22 +84,34 @@ def test_historical_manifest_preserves_rules_and_scripts() -> None:
     baseline = Path(__file__).parent / "fixtures/legacy-template-manifest.json"
     historical = json.loads(baseline.read_text(encoding="utf-8"))
     current = template_manifest(template_files())
+    # dev restored these guides from main in e7ef24b, 76b4b31, and f20da9b.
+    # Pin those revisions while retaining the original hashes in the fixture.
+    expected = historical | {
+        ".agents/skills/finalize-implementation/SKILL.md": (
+            "4410e777caf91f107c520cfddd7f9a7c8e6f5d98594faf4e027c53c3745cbf74"
+        ),
+        ".agents/skills/git-change-workflow/SKILL.md": (
+            "d454e319a45bfc4f0b0bfe384df5d5669f225b582781caf0c742cee4e58d26b7"
+        ),
+        ".agents/skills/list-repositories/SKILL.md": (
+            "363f1f4ad81d62ca14ee0f9003433efb339013be2260fbee59d16973a56cbc29"
+        ),
+    }
     # #9 changed workflow documents in 0.2.0; #10 explicitly amended the
-    # constitution in 0.2.1. Keep the historical fixture intact and pin the
-    # approved amendment separately to protect every other original asset byte.
+    # constitution in 0.2.1. The fixture pins the original hashes of the
+    # surviving assets. The approved constitution is pinned separately below.
     revised = {
         "CONSTITUTION.md",
         "AGENTS.md",
         ".agents/README.md",
         ".agents/github-mcp-contract.md",
         ".agents/github-issue-contract.md",
-        ".agents/github-workflow-acceptance.md",
         ".agents/skills/finalize-implementation/references/phase-contracts.md",
         ".agents/skills/create-issue/SKILL.md",
         ".agents/skills/get-issue/SKILL.md",
         ".agents/skills/update-issue/SKILL.md",
     }
-    assert {name for name in historical if historical[name] != current[name]} == revised
+    assert {name for name in expected if expected[name] != current[name]} == revised
     assert set(current) - set(historical) == {
         f".agents/docs/{name}.md"
         for name in ("configuration", "profiles", "diagnostics", "validation")
