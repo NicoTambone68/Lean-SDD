@@ -1,5 +1,6 @@
 """Local diagnostics must be informative without running project code."""
 
+import hashlib
 import json
 import os
 import socket
@@ -189,6 +190,29 @@ def test_missing_retired_template_remains_a_failure(
         "FAIL: Missing installed template: '.agents/retired.md'"
         in capsys.readouterr().out
     )
+
+
+@pytest.mark.usefixtures("local_tools")
+def test_previous_release_preserves_customized_retired_document(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    initialize(tmp_path)
+    name = ".agents/retired.md"
+    record = tmp_path / STATE_PATH
+    state = json.loads(record.read_text(encoding="utf-8"))
+    state["template_version"] = "0.3.0"
+    state["files"][name] = hashlib.sha256(b"Original instructions\n").hexdigest()
+    record.write_text(json.dumps(state), encoding="utf-8")
+    (tmp_path / name).write_bytes(b"Local instructions\n")
+    before = installation_snapshot(tmp_path)
+
+    assert main(["doctor", str(tmp_path)]) == 0
+    output = capsys.readouterr().out
+    assert f"WARN: Templates removed in current release: {name!r}" in output
+    assert f"WARN: Locally modified template: {name!r}" in output
+    assert main(["init", str(tmp_path)]) == 1
+    assert "no migration" in capsys.readouterr().err
+    assert installation_snapshot(tmp_path) == before
 
 
 @pytest.mark.parametrize("difference", ["added", "removed", "changed"])

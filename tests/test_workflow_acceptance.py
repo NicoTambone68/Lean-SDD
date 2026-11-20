@@ -51,10 +51,7 @@ def test_workflow_gates_and_execution_boundary(composed: bool) -> None:
     assert "Do not use the GitHub `.env` loader for application validation" in setup
     assert "Native Windows and macOS validation are unsupported" in setup
     assert "never updates project templates automatically" in setup
-    assert (
-        b"live acceptance has not been established"
-        in payload[".agents/github-workflow-acceptance.md"]
-    )
+    assert "explicit authorization for a live run in a disposable project" in setup
 
 
 @pytest.mark.parametrize("selected", [("fixture",), ("fixture", "python")])

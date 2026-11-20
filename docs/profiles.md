@@ -47,7 +47,7 @@ enter the distributions; credentials and live acceptance evidence stay excluded.
 | Python rules | root `CODING_STANDARDS.md`, unchanged | `.agents/standards/python.md` in composed bundles; `CODING_STANDARDS.md` in legacy output |
 | TypeScript rules and toolchain guide | explicit `src/lean_sdd/template_overrides/` and `docs/typescript.md` sources | `.agents/standards/typescript.md` and `.agents/docs/typescript.md` |
 | Configuration/profile/diagnostic/execution references | `docs/` sources, explicitly mapped | `.agents/docs/` |
-| Generic readiness and ignore rules | existing files under `src/lean_sdd/template_overrides/` | original `.agents/` destinations |
+| Local ignore rules | `src/lean_sdd/template_overrides/gitignore` | `.agents/.gitignore` |
 
 Reusing root Python standards prevents a second normative copy from drifting.
 The setup document also relocates exactly four `../docs/` reference links to

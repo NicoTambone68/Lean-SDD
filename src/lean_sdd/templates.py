@@ -38,7 +38,6 @@ CORE_FILES = frozenset(
         ".agents/.gitignore",
         ".agents/github-mcp-contract.md",
         ".agents/github-issue-contract.md",
-        ".agents/github-workflow-acceptance.md",
     }
     | {f".agents/skills/{skill}/SKILL.md" for skill in CORE_SKILLS}
     | {

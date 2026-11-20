@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "lean-sdd-cli"
-version = "0.3.0"
+version = "0.3.1"
 description = "Install an issue-driven GitHub workflow for coding agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -60,7 +60,6 @@ exclude = [
 ".agents/skills/update-issue/SKILL.md" = "lean_sdd_templates/common/.agents/skills/update-issue/SKILL.md"
 ".agents/skills/update-issue/scripts/close-issue.sh" = "lean_sdd_templates/common/.agents/skills/update-issue/scripts/close-issue.sh"
 ".agents/skills/update-issue/scripts/comment-issue.sh" = "lean_sdd_templates/common/.agents/skills/update-issue/scripts/comment-issue.sh"
-"src/lean_sdd/template_overrides/readiness.md" = "lean_sdd_templates/common/.agents/github-workflow-acceptance.md"
 "src/lean_sdd/template_overrides/gitignore" = "lean_sdd_templates/common/.agents/.gitignore"
 
 [tool.hatch.build.targets.sdist]

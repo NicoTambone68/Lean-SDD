@@ -4,7 +4,6 @@
   ".agents/README.md": "cd6a29a21eebfc2a9c7feb32630ec4c30ed374e6be3c2cc69c7c454efaadf972",
   ".agents/github-issue-contract.md": "1a9ae34d22edb01f4d48ed79144a64befd0ea896cd66c0653728804b014e4bc5",
   ".agents/github-mcp-contract.md": "a1e6f471d692fe33dfdc5664c8a9c1b4f22db53b6e31dbebcdf6a721bc5ca6c0",
-  ".agents/github-workflow-acceptance.md": "bc41b30a99eee178119b1579ff2c059a963dabb98677a8220163c5f213390fec",
   ".agents/lib/github-identity.sh": "9860f6d50e69f7b11b18aa2c9a76ca95dd23b8ed368a3ced9db7b87d652ee393",
   ".agents/lib/github-issues.sh": "74e4be435f2dd2b1bc0aaf26452301d4899bd96b8e4a0fdaf8a5a5cd92feaf81",
   ".agents/lib/github-mcp.sh": "fed47593233dea4f5d87aae9beb17f23ac0610edcc8780f9a654dbc8f3de5463",
