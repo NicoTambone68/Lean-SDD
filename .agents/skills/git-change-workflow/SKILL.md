@@ -44,7 +44,8 @@ Use non-closing traceability in implementation commits, for example
 repository-scoped; `gh-42` alone does not identify a repository. Never add an
 automatic closing keyword to a commit or PR description; closure is a separate
 post-finalization operation. On failure, use `update-issue` for the failure
-checkpoint, then stop. See [the B contract](../../github-issue-contract.md).
+checkpoint, then stop. See
+[the issue and branch contract](../../github-issue-contract.md).
 
 ## Successful handoff example
 
