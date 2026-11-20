@@ -97,9 +97,8 @@ def test_historical_manifest_preserves_rules_and_scripts() -> None:
             "363f1f4ad81d62ca14ee0f9003433efb339013be2260fbee59d16973a56cbc29"
         ),
     }
-    # #9 changed workflow documents in 0.2.0; #10 explicitly amended the
-    # constitution in 0.2.1. The fixture pins the original hashes of the
-    # surviving assets. The approved constitution is pinned separately below.
+    # Keep the original hashes in the fixture. Pin the constitution approved
+    # in issue #23 separately below.
     revised = {
         "CONSTITUTION.md",
         "AGENTS.md",
@@ -117,7 +116,7 @@ def test_historical_manifest_preserves_rules_and_scripts() -> None:
         for name in ("configuration", "profiles", "diagnostics", "validation")
     }
     assert current["CONSTITUTION.md"] == (
-        "3a4775e0f56bfdee914924e4d5470f697f19904857b659c5c3a7f4c8cc96578a"
+        "2a88fc866a0b2e3dc2ae4a0b481f42a84f1f5ac35a9b68358238444ee6637d7b"
     )
     assert package_version() not in {"0.1.0", "0.2.0"}
 

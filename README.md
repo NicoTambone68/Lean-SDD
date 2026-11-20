@@ -104,7 +104,7 @@ lean-sdd --version
 
 If the executable directory is not on your PATH, run `uv tool update-shell`
 and restart your shell. A built wheel can also be installed with
-`uv tool install /path/to/lean_sdd_cli-0.3.1-py3-none-any.whl`.
+`uv tool install /path/to/lean_sdd_cli-0.3.2-py3-none-any.whl`.
 The package has not been published to PyPI; installation by the bare name
 `lean-sdd-cli` is not an advertised installation method yet.
 
