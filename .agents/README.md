@@ -2,11 +2,14 @@
 
 The complete orchestration is in [AGENTS.md](../AGENTS.md). Engineering rules
 live in [CONSTITUTION.md](../CONSTITUTION.md) and
-[CODING_STANDARDS.md](../CODING_STANDARDS.md). Read these before implementation.
+[CODING_STANDARDS.md](../CODING_STANDARDS.md). Read these and every applicable profile standard before implementation. Root
+coding standards explicitly link installed language standards; component and
+shared-interface scope determines which rules apply. Six core skills are always
+required; a supported profile may declare additional skills without overriding them.
 
 ## Layout and prerequisites
 
-Paths are relative to the adopting project root. Six skills under `skills/`
+Paths are relative to the adopting project root. Six core skills under `skills/`
 provide Bash entry points; shared helpers live in `lib/`. Scripts perform
 individual operations, while the agent owns sequencing and human approval.
 
@@ -20,7 +23,7 @@ declared validation tools; the Bash skills have no Python package dependencies.
 Supply an already provisioned GitHub repository and explicitly select its
 owner/repository and existing working/base branch. Both effective origin fetch
 and push URLs must identify that repository. No base defaults to `main`.
-Provisioning and remote replacement are outside this workflow.
+Provisioning, migration, and remote replacement are outside this workflow.
 
 `lean-sdd doctor` performs local diagnostics without loading `.env`, contacting
 GitHub, running project code, or proving readiness. A missing credential is
@@ -31,8 +34,13 @@ configured. Local warnings still need resolution where relevant to live use.
 
 `.agents/lean-sdd-install.json` records the original template release and each
 installed file's SHA-256 hash. Commit it with the workflow and preserve it when
-customizing templates. Schema-version-1 records remain supported without manual
-migration. The installed template version can differ from the current CLI
+customizing templates. Schema-version-1 records remain readable as legacy Python without rewriting them.
+New installations use schema 2 with a sorted installed profile set and explicit
+configuration mode; older CLIs need not understand schema 2. `lean-sdd.toml` owns
+the current reviewed mapping and commands; the record owns original asset hashes.
+A generated TOML is hashed, while pre-existing user TOML is preserved and unowned.
+Valid edits within the installed profile set do not rewrite original hashes.
+A missing configured TOML fails instead of inventing a replacement mapping. The installed template version can differ from the current CLI
 version: updating the CLI never updates project templates automatically.
 
 Run `lean-sdd doctor /path/to/project` to inspect three separate observations:
@@ -158,13 +166,46 @@ blindly retry uncertain writes or substitute new observations for approved state
 
 ## Validation and readiness
 
-The adopting Python project supplies its own source, tests, `pyproject.toml`,
-and `uv.lock`. Required commands are defined in `AGENTS.md`: pytest, Ruff linting
-and formatting, and mypy through `uv run`. The installer does not create an
-application scaffold or execute those commands in the target project.
+For composed installations, review `lean-sdd.toml` and all applicable standards,
+then explicitly run `lean-sdd validate .` from the root. Review every command and
+working directory, including configuration edits, before execution. The CLI runs
+structured argv without a shell, in deterministic check-name order; it does not
+sandbox project code, redact child stdout/stderr, or make arbitrary commands safe.
+Do not use the GitHub `.env` loader for application validation. Child processes
+inherit your environment and normal tools may synchronize dependencies or access
+the network. No automatic retry or automatic command approval is supplied.
 
-Verify current server capabilities and repository permissions before live use.
-Installer tests and local diagnostics do not establish those permissions.
+Each Python component supplies its own source, tests, `pyproject.toml`, `uv.lock`,
+and declared development tools. The full gate runs pytest, Ruff lint/format and
+mypy through uv at each Python component root, plus all required project checks.
+Optional failures remain visible; required nonzero exits, missing tools/setup,
+timeouts, cancellation and not-run required checks prevent success. Doctor is
+local and non-executing: missing application setup can be advisory there but
+blocks validation. Init neither scaffolds applications nor executes checks.
+
+Validation currently requires Linux process-group semantics, including Linux
+under WSL, and invocation from the main thread. It terminates owned process groups
+on completion, timeout and interruption; commands must not detach into new groups
+or services. Native Windows and macOS validation are unsupported. Installation
+and local diagnostics do not establish support for the complete Bash/Git workflow.
+
+This Lean-SDD source repository and legacy Python installations retain the four
+root maintenance commands in `AGENTS.md`. Component-aware applications use the
+reviewed configured gate; additional profiles never remove mandatory checks.
+For complete schemas, examples, diagnostics and execution behavior, read the
+[configuration](../docs/configuration.md), [profiles](../docs/profiles.md),
+[diagnostics](../docs/diagnostics.md) and [validation](../docs/validation.md) references.
+
+Updating the CLI does not change installed documents. Use a separate fresh target
+to compare releases, preserve the original record and local customizations, and
+obtain a separately scoped manual migration plan before adopting new assets or
+profile identities. Never edit hashes or rerun init to force an upgrade. New
+releases may change template bytes; same-release repeats remain conservative.
+
+Live acceptance remains separate from installer tests and local diagnostics.
+See [readiness and acceptance](github-workflow-acceptance.md). Historical server
+observations in the reference contracts do not prove current capabilities or
+permissions. Use current observations for each deployment.
 
 Operational references:
 
