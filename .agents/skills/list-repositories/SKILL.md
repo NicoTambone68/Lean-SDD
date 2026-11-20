@@ -17,9 +17,9 @@ uv run --no-project --env-file .agents/.env -- \
 ```
 
 uv loads `GITHUB_MCP_URL` and `GITHUB_TOKEN` from `.agents/.env` while preserving
-existing environment values. Never print the token. The script uses A's HTTP MCP
-transport and `get_me` followed by
-`search_repositories`; no CLI or direct API fallback is provided.
+existing environment values. Never print the token. The script uses the shared
+HTTP MCP transport and `get_me` followed by `search_repositories`; no CLI or direct
+API fallback is provided.
 
 Exit 0 emits JSON containing `query`, `repositories`, `total_count`, `pages`,
 `incomplete_results`, and `incomplete_reasons`. Each repository has `owner`,
@@ -36,8 +36,8 @@ Malformed responses, inaccessible tools, or transport failures exit nonzero with
 stderr diagnostics and no successful JSON. Stop and report the failure.
 
 Retain the selected `owner` and `repo` explicitly for subsequent skills. See
-[the B contract](../../github-issue-contract.md) for response evidence and the
-live acceptance boundary.
+[the issue and branch contract](../../github-issue-contract.md) for response
+validation and repository selection requirements.
 
 ## Successful handoff example
 
