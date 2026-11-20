@@ -94,19 +94,26 @@ Before using the workflow in a new project, follow the
 
 ## Install the CLI
 
-The installer requires Python 3.11 or newer and uv. From a checkout of this
-repository, install the CLI into uv's isolated tool environment:
+The installer requires Python 3.11 or newer and uv. Install the published CLI
+from PyPI into uv's isolated tool environment:
+
+```bash
+uv tool install lean-sdd
+```
+
+To install the version in a local checkout, run this from the repository root:
 
 ```bash
 uv tool install .
-lean-sdd --version
 ```
 
-If the executable directory is not on your PATH, run `uv tool update-shell`
-and restart your shell. A built wheel can also be installed with
-`uv tool install /path/to/lean_sdd_cli-0.3.2-py3-none-any.whl`.
-The package has not been published to PyPI; installation by the bare name
-`lean-sdd-cli` is not an advertised installation method yet.
+Both install the `lean-sdd` command. To install a wheel you have built, use
+`uv tool install /path/to/lean_sdd-0.3.3-py3-none-any.whl`. Run
+`lean-sdd --version` to check the installed version. If the executable
+directory is missing from your PATH, run `uv tool update-shell` and restart
+your shell. If uv reports that a previous checkout installation owns the
+executable, remove it with `uv tool uninstall lean-sdd-cli` before installing
+`lean-sdd`.
 
 Initialize a separate target project:
 
@@ -309,12 +316,10 @@ commit `uv.lock`, and keep the generated `.venv/` out of version control. The
 lockfile records resolved dependency versions for consistent installations.
 See [uv project structure and files](https://docs.astral.sh/uv/concepts/projects/layout/).
 
-Use `uv sync` to synchronize the project environment and `uv run` to execute
-project commands. Both normally update the lockfile and environment as needed;
-when validation must reject changes to the lockfile, use their `--locked`
-option. See [uv locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/)
-for the exact behavior. Declare pytest, Ruff, and mypy as development dependencies
-for the supplied Python validation workflow.
+Declare pytest, Ruff, and mypy as development dependencies. Before validation,
+run `uv sync --locked` to prepare the environment and reject a stale lockfile.
+Then run the four mandatory Python checks with their exact arguments as listed
+in the [configuration guide](docs/configuration.md). [uv locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/)
 
 ## Workflow and approval gates
 
@@ -639,16 +644,15 @@ The build uses an explicit allowlist for workflow assets. Update the mappings
 when adding an asset.
 
 After editing template files, refresh the editable installation's bundled
-resources with `uv sync --reinstall-package lean-sdd-cli` before testing.
+resources with `uv sync --reinstall-package lean-sdd` before testing.
 The tests check conflicts, repeated initialization, symlink rejection, write
 failure cleanup, diagnostics, links, Bash syntax, wheel contents, rebuilding a
 wheel from the source archive, and isolated `uv tool install` execution. Build
 tests use uv's local cache without network access after development setup.
 
-`uv build` creates a wheel and source archive in `dist/`. This prepares release
-artifacts locally; it does not publish a package. Public release still requires
-selecting an available package name, establishing licensing and PyPI ownership,
-and completing the relevant release review and live workflow acceptance.
+`uv build` creates a wheel and source archive in `dist/`. Local development
+may be ahead of PyPI between releases. Publish selected versions as `lean-sdd`
+after the relevant release review and live workflow acceptance.
 Upgrading the CLI does not update previously initialized projects automatically.
 
 ## Validation and further reading

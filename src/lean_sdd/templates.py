@@ -177,7 +177,7 @@ def template_manifest(payload: Mapping[str, bytes]) -> dict[str, str]:
 
 def package_version() -> str:
     """Return the version of the installed distribution."""
-    return version("lean-sdd-cli")
+    return version("lean-sdd")
 
 
 def _asset_path(name: str) -> bool:
@@ -364,30 +364,37 @@ def compose_bundle(
     )
 
 
-def _python_standards(content: bytes) -> bytes:
-    """Relocate only the canonical root-document links; preserve every rule byte."""
-    for filename in ("CONSTITUTION.md", "AGENTS.md"):
-        old = f"]({filename})".encode()
-        if content.count(old) != 1:
-            raise ValueError("Python standards have unexpected root-document links.")
-        content = content.replace(old, f"](../../{filename})".encode())
+def _relocate_links(content: bytes, links: Mapping[str, str]) -> bytes:
+    """Rewrite the declared checkout destinations for the installed document."""
+    for source, destination in links.items():
+        original = f"]({source})".encode()
+        if content.count(original) != 1:
+            raise ValueError(f"Expected one documentation link to {source!r}.")
+        content = content.replace(original, f"]({destination})".encode())
     return content
 
 
 def _common_resources(root: Traversable) -> dict[str, bytes]:
-    """Relocate setup links to the installed private documentation directory.
-
-    The source setup document and installed asset share one authority. Only the
-    four declared reference links move; no executable template language is used.
-    """
+    """Read common assets and relocate their links for the project root."""
     payload = _read_tree(root.joinpath("common"))
-    setup = payload.get(".agents/README.md", b"")
-    for name in ("configuration", "profiles", "diagnostics", "validation"):
-        source = f"](../docs/{name}.md)".encode()
-        if setup.count(source) != 1:
-            raise ValueError("Setup documentation has unexpected reference links.")
-        setup = setup.replace(source, f"](docs/{name}.md)".encode())
-    payload[".agents/README.md"] = setup
+    payload[".agents/README.md"] = _relocate_links(
+        payload.get(".agents/README.md", b""),
+        {
+            f"../docs/{name}.md": f"docs/{name}.md"
+            for name in ("configuration", "profiles", "diagnostics", "validation")
+        },
+    )
+    payload["CODING_STANDARDS.md"] = _relocate_links(
+        payload.get("CODING_STANDARDS.md", b""),
+        {
+            f"../../../{path}": path
+            for path in (
+                "CONSTITUTION.md",
+                "AGENTS.md",
+                ".agents/README.md#validation-and-readiness",
+            )
+        },
+    )
     return payload
 
 
@@ -426,8 +433,19 @@ def resolve_bundle(
             )
         contribution = {r.destination: resources[r.source] for r in profile.resources}
         if profile_id == "python":
-            contribution[profile.standards_path] = _python_standards(
-                contribution[profile.standards_path]
+            contribution[profile.standards_path] = _relocate_links(
+                contribution[profile.standards_path],
+                {name: f"../../{name}" for name in ("CONSTITUTION.md", "AGENTS.md")},
+            )
+        elif profile_id == "typescript":
+            contribution[profile.standards_path] = _relocate_links(
+                contribution[profile.standards_path],
+                {
+                    "common-standards.md": "../../CODING_STANDARDS.md",
+                    "../../../CONSTITUTION.md": "../../CONSTITUTION.md",
+                    "../../../AGENTS.md": "../../AGENTS.md",
+                    "../../../docs/typescript.md": "../docs/typescript.md",
+                },
             )
         contributions[profile_id] = contribution
     return compose_bundle(

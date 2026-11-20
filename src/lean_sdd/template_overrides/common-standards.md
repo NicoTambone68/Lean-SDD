@@ -1,7 +1,7 @@
 # Shared Coding Standards
 
-These standards implement [CONSTITUTION.md](CONSTITUTION.md) for every declared
-component. [AGENTS.md](AGENTS.md) owns workflow sequencing, approval gates,
+These standards implement [CONSTITUTION.md](../../../CONSTITUTION.md) for every declared
+component. [AGENTS.md](../../../AGENTS.md) owns workflow sequencing, approval gates,
 validation execution, failure handling, and completion. Neither these standards
 nor a language profile may weaken either document.
 
@@ -56,7 +56,7 @@ After reviewing the mapping and commands, the composed application workflow runs
 component and project check, including applicable interface tests. Python retains
 its four mandatory commands at each component root. Focused checks do not replace
 the final suite. Initialization and doctor never execute these commands; a doctor
-setup warning may still block validation. See [setup](.agents/README.md#validation-and-readiness)
+setup warning may still block validation. See [setup](../../../.agents/README.md#validation-and-readiness)
 for command trust, prerequisites, and the separate repository maintenance gate.
 
 Existing Python conventions, typing, documentation, numerical semantics, error

@@ -60,6 +60,11 @@ the same root documents through `../../`. It requires exactly one occurrence of
 each original link; unexpected source changes fail for review. The text of every
 Python requirement remains identical, as verified by a full-document comparison.
 
+The shared and TypeScript standards templates link to files in the checkout.
+The resource loader rewrites those relative links for the installed project.
+For example, the TypeScript standards' link to `common-standards.md` points to
+the generated root `CODING_STANDARDS.md` after installation.
+
 The common standards contain exactly one literal `{{profile_standards}}` marker.
 Composition replaces it with links to the selected profiles' canonical standards
 paths, sorted by profile ID. This is a fixed text substitution, not an executable

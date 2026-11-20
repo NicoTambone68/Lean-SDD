@@ -13,6 +13,7 @@ from lean_sdd.profiles import PYTHON, Profile, ProfileRegistry, RequiredCheck, R
 from lean_sdd.templates import (
     CORE_SKILLS,
     MAX_RESOURCE_BYTES,
+    _common_resources,
     compose_bundle,
     package_version,
     resolve_bundle,
@@ -38,9 +39,7 @@ def read_resources(root: Traversable) -> dict[str, bytes]:
 
 @pytest.fixture
 def common() -> dict[str, bytes]:
-    common = read_resources(files("lean_sdd_templates").joinpath("common"))
-    common[".agents/README.md"] = resolve_bundle().payload[".agents/README.md"]
-    return common
+    return _common_resources(files("lean_sdd_templates"))
 
 
 @pytest.fixture

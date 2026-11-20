@@ -11,6 +11,7 @@ import pytest
 from lean_sdd.profiles import PYTHON, Profile, ProfileRegistry, RequiredCheck, Resource
 from lean_sdd.templates import (
     CORE_SKILLS,
+    _common_resources,
     compose_bundle,
     resolve_bundle,
     template_files,
@@ -70,14 +71,8 @@ def test_inert_profile_bundle_contract(
         ),
         skills=("fixture-check",),
     )
-    production = resolve_bundle()
-    common = dict(production.payload)
-    python = {PYTHON.standards_path: common.pop(PYTHON.standards_path)}
-    common["CODING_STANDARDS.md"] = (
-        files("lean_sdd_templates")
-        .joinpath("common", "CODING_STANDARDS.md")
-        .read_bytes()
-    )
+    common = _common_resources(files("lean_sdd_templates"))
+    python = {PYTHON.standards_path: resolve_bundle().payload[PYTHON.standards_path]}
     additions = {
         ".agents/standards/fixture.md": (
             b"# Inert rules\nRead [shared](../../CODING_STANDARDS.md).\n"

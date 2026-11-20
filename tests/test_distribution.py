@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import posixpath
 import re
 import shutil
 import subprocess
@@ -25,6 +26,36 @@ from lean_sdd.templates import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize(
+    ("template", "installed_name"),
+    [
+        ("common-standards.md", "CODING_STANDARDS.md"),
+        ("typescript-standards.md", ".agents/standards/typescript.md"),
+    ],
+)
+def test_checkout_and_installed_standards_links(
+    template: str, installed_name: str
+) -> None:
+    directory = ROOT / "src/lean_sdd/template_overrides"
+    source = (directory / template).read_text(encoding="utf-8")
+    payload = resolve_bundle(("typescript",)).payload
+    installed = payload[installed_name].decode("utf-8")
+    moved = {
+        directory / "common-standards.md": "CODING_STANDARDS.md",
+        ROOT / "docs/typescript.md": ".agents/docs/typescript.md",
+    }
+    for label, link in re.findall(r"\[([^\]]+)\]\(([^)]+)\)", source):
+        path, separator, anchor = link.partition("#")
+        target = (directory / path).resolve()
+        assert target.is_file(), link
+        destination = moved.get(target, target.relative_to(ROOT).as_posix())
+        assert destination in payload
+        relative = posixpath.relpath(
+            destination, posixpath.dirname(installed_name) or "."
+        )
+        assert f"[{label}]({relative}{separator}{anchor})" in installed
 
 
 def run(
@@ -138,7 +169,18 @@ def test_wheel_and_sdist_install_without_checkout(
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(sentinel)
     run(
-        ["uv", "build", "--no-sources", "--offline", "--out-dir", str(output)],
+        # Explicit flags build both artifacts from this checkout. The default
+        # would instead build the first wheel from the sdist as well.
+        [
+            "uv",
+            "build",
+            "--sdist",
+            "--wheel",
+            "--no-sources",
+            "--offline",
+            "--out-dir",
+            str(output),
+        ],
         source,
         env,
     )
@@ -243,7 +285,7 @@ def test_wheel_and_sdist_install_without_checkout(
     python = (
         tmp_path
         / "tools"
-        / "lean-sdd-cli"
+        / "lean-sdd"
         / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
     )
     typescript_probe = run(
@@ -284,9 +326,18 @@ def test_wheel_and_sdist_install_without_checkout(
         "profiles": ["python"],
         "manifest": template_manifest(composed.payload),
     }
-    assert (
-        f"lean-sdd {package_version()}"
-        in run([str(executable), "--version"], tmp_path, env).stdout
+    installed_version = run(
+        [
+            str(python),
+            "-c",
+            "from importlib.metadata import version; print(version('lean-sdd'))",
+        ],
+        tmp_path,
+        env,
+    ).stdout.strip()
+    assert installed_version == project["project"]["version"]
+    assert run([str(executable), "--version"], tmp_path, env).stdout.strip() == (
+        f"lean-sdd {installed_version}"
     )
     dry_target = tmp_path / "dry project"
     dry = run([str(executable), "init", str(dry_target), "--dry-run"], tmp_path, env)

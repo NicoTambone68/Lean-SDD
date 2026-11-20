@@ -126,7 +126,7 @@ search hit, the issue from a branch, or `WORKING_BRANCH` from a default.
 | Issue | `owner`, `repo`, `issue_number`, `issue_url`, complete `title`, complete `body`, observed `state` |
 | Comment | `owner`, `repo`, `issue_number`, returned `comment_id` |
 | Discovery | `repositories` with returned identities/URLs; actual pagination and incomplete-result indication; never silently present partial results as complete |
-| Publication | `owner`, `repo`, `issue_number`, `issue_url`, `PR_ID` (PR number), `PR_URL`, `SOURCE_COMMIT`, `BRANCH`, `WORKING_BRANCH` |
+| Publication | `owner`, `repo`, `issue_number`, `issue_url`, `issue_reference`, `PR_ID` (PR number), `PR_URL`, `SOURCE_COMMIT`, `BRANCH`, `WORKING_BRANCH` |
 | Finalization | retained publication identity, verified `merged` result, actual `merge_commit`, actual local synchronization result and working-branch commit |
 | Closure | explicit repository/issue identity and observed `state=closed`; otherwise an explicit unconfirmed outcome with nonzero exit |
 

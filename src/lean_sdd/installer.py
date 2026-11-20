@@ -112,8 +112,9 @@ def initialize(
 ) -> InstallResult:
     """Resolve profiles and install missing files after complete read-only preflight.
 
-    Fresh installs use composed assets and schema 2, generating a root Python
-    configuration only when no user file exists. Existing records, configuration,
+    Fresh installs use composed assets and schema 2. A target without a user
+    configuration gets a root Python configuration by default, or a TypeScript
+    configuration when explicitly selected. Existing records, configuration,
     and identical assets are never rewritten; schema 1 uses its legacy bundle.
     On failure remove only files/directories created by this invocation. The
     target must not be concurrently modified while initialization is running.

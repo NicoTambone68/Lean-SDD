@@ -9,8 +9,9 @@ required; a supported profile may declare additional skills without overriding t
 
 ## Layout and prerequisites
 
-Paths are relative to the adopting project root. Six core skills under `skills/`
-provide Bash entry points; shared helpers live in `lib/`. Scripts perform
+Paths are relative to the adopting project root. Six core skills under
+`.agents/skills/` provide Bash entry points. Shared helpers live in
+`.agents/lib/`. Scripts perform
 individual operations, while the agent owns sequencing and human approval.
 
 The workflow requires uv, Bash 4 or newer, Git, curl, jq, and standard shell tools
