@@ -9,8 +9,9 @@ required; a supported profile may declare additional skills without overriding t
 
 ## Layout and prerequisites
 
-Paths are relative to the adopting project root. Six core skills under `skills/`
-provide Bash entry points; shared helpers live in `lib/`. Scripts perform
+Paths are relative to the adopting project root. Six core skills under
+`.agents/skills/` provide Bash entry points. Shared helpers live in
+`.agents/lib/`. Scripts perform
 individual operations, while the agent owns sequencing and human approval.
 
 The workflow requires uv, Bash 4 or newer, Git, curl, jq, and standard shell tools
@@ -202,10 +203,10 @@ obtain a separately scoped manual migration plan before adopting new assets or
 profile identities. Never edit hashes or rerun init to force an upgrade. New
 releases may change template bytes; same-release repeats remain conservative.
 
-Live acceptance remains separate from installer tests and local diagnostics.
-See [readiness and acceptance](github-workflow-acceptance.md). Historical server
-observations in the reference contracts do not prove current capabilities or
-permissions. Use current observations for each deployment.
+Before claiming workflow readiness, obtain explicit authorization for a live run in a disposable project.
+Verify current MCP capabilities and Git access for the selected repository and base.
+Follow [the issue workflow](../AGENTS.md) through all three approval pauses, merge,
+local synchronization, and verified issue closure. Record the observed results.
 
 Operational references:
 

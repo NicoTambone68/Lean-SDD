@@ -10,15 +10,28 @@ work and are not authorized by this workflow. See
 Read the project's [CONSTITUTION.md](CONSTITUTION.md) and
 [CODING_STANDARDS.md](CODING_STANDARDS.md) before planning or modifying files.
 The constitution defines engineering invariants; the coding standards define
-concrete Python rules. This file owns workflow orchestration and enforces those
-rules without duplicating or overriding them. Include a Constitution Check
+concrete rules. In a composed installation, root coding standards link the
+installed `.agents/standards/<profile>.md` documents: explicitly read every
+profile relevant to the change, including all profiles of an affected component.
+Do not depend on automatic discovery of nested instruction files. Identify
+components and shared interfaces affected by source, shared-file, mapping, or
+check changes. Include their applicable standards and integration/contract
+checks in the issue plan. Conflicting rules block implementation; profiles cannot
+weaken shared governance or another profile's required checks.
+
+This file owns workflow orchestration and enforces those rules without
+duplicating or overriding them. Include a Constitution Check
 classifying each principle as PASS, NOT APPLICABLE, or VIOLATION with a concise
 justification, and identify applicable coding standards. A violation blocks
 implementation: identify the principle, record a failure checkpoint if an issue
 is already known, and STOP.
 Never amend or bypass the constitution without an explicit amendment request.
-Read both rule documents again against the complete freshly retrieved issue
-after approval.
+Read both rule documents and all applicable profile standards again against the
+complete freshly retrieved issue after approval. Review `lean-sdd.toml`, when
+present, as the authoritative component and check mapping, together with installed
+profile identity. Never infer profiles from filenames or silently repair invalid
+configuration. Configuration is executable project intent only after review;
+reading a repository, initialization, and diagnostics do not authorize its commands.
 
 Check the proposed file scope against Constitution principle III before
 implementation. A source-boundary violation blocks implementation; apply the
@@ -40,7 +53,8 @@ The working branch is mandatory. Never infer it from HEAD or default to `main`;
 `main` is valid only when explicitly selected. Preserve the selection through
 branch preparation, publication, merge and final local synchronization.
 
-Use the six skills under `.agents/skills/` and their Bash entry points. GitHub
+Use the six core skills under `.agents/skills/` and any declared profile additions.
+Keep their Bash entry points and shared contracts intact. GitHub
 service operations use only the configured official GitHub MCP server. Git
 operations use local Git with separate credentials. Verify deployed tool schemas
 and identity as described in setup; identity reads do not prove write access or
@@ -107,7 +121,33 @@ approved issue in accordance with `CONSTITUTION.md` and `CODING_STANDARDS.md`.
 
 ## 3. Validate, commit and record implementation
 
-Run all required checks in the project root:
+For composed installations (schema-2 installation record), require the recorded
+profile assets under `.agents/standards/`; missing assets block the gate rather
+than selecting legacy validation. Review the current mapping, every command argument list,
+working directory, required status, timeout, executable/toolchain and inherited environment before
+execution. Review mapping/check changes again after implementation; valid syntax
+is not evidence of trust. Do not load GitHub credentials just to run application
+checks. Run from the project root on Linux (including a suitable WSL environment):
+
+```bash
+lean-sdd validate .
+```
+
+This final gate runs the full configured required suite across all components
+and required project-wide checks, including checks outside the files changed.
+Focused development checks do not replace it. Python components retain all four
+mandatory commands below at each component root. Supply component manifests,
+lockfiles and tooling first. No dependency-based final-check selection or
+automatic migration is supported. Optional failures remain visible; required
+failures, missing prerequisites, cancellation, or not-run required checks block
+staging and committing. Interacting components also need appropriate shared
+interface/contract tests; isolated type checks alone do not establish compatibility.
+The CLI neither sandboxes project code nor redacts child output: use only reviewed
+commands and avoid exposing secrets. See [setup](.agents/README.md#validation-and-readiness).
+
+For maintenance of this Lean-SDD Python source repository, and legacy Python
+installations without composed profile standards, run all four required checks
+in the project root:
 
 ```bash
 uv run pytest

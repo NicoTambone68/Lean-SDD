@@ -1,0 +1,21 @@
+{
+  "name": "lean-sdd-typescript-acceptance",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "npm@11.20.0",
+  "engines": { "node": ">=26.13.1 <27" },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --config src/eslint.config.mjs src/index.ts",
+    "format:check": "prettier --check src/index.ts src/eslint.config.mjs tests/*.mjs",
+    "test": "node --test tests/contract.test.mjs",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "6.0.3",
+    "eslint": "10.14.0",
+    "typescript-eslint": "8.72.2",
+    "prettier": "3.10.0"
+  }
+}

@@ -31,7 +31,11 @@ issue before the finalization checkpoint.
 
 ## Implementation checkpoint
 
-Only after implementation, required validation, and commit succeed:
+Only after implementation, required validation, and commit succeed. Follow root
+`AGENTS.md` for the validation gate: record the full component/project suite and
+visible optional outcomes for composed applications, or the four maintenance
+commands for this Python repository. Do not replace required integration checks
+with isolated language checks or describe doctor as executed validation:
 
 ```text
 • Implemented and committed <description>.
@@ -136,8 +140,7 @@ time of that read. A denied, missing, malformed, timed-out, or mismatched respon
 leaves closure unconfirmed. In either case stop: do not blindly repeat the update,
 assume the current state, or add a failure audit claiming the issue remains open.
 The script does not infer whether orchestration prerequisites were completed;
-the caller must enforce them. See
-[the issue and branch contract](../../github-issue-contract.md).
+the caller must enforce them. See [the issue and branch contract](../../github-issue-contract.md).
 
 ## Successful handoff example
 

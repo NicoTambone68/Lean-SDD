@@ -64,7 +64,7 @@ errors are summarized because raw errors can expose credential-bearing URLs.
 - After creation, stop for implementation approval; read the current issue anew
   and recheck the constitution before branch preparation. Preserve the full
   current plan and explicit owner/repo/number throughout.
-- Use `update-issue/SKILL.md` templates for implementation, pull-request,
+- Use the [update-issue templates](skills/update-issue/SKILL.md) for implementation, pull-request,
   finalization, and failure checkpoints, populated only with actual facts.
 - Implementation checkpoint success precedes separate publication approval.
   Successful publication and PR checkpoint precede separate merge approval.

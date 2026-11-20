@@ -126,7 +126,7 @@ search hit, the issue from a branch, or `WORKING_BRANCH` from a default.
 | Issue | `owner`, `repo`, `issue_number`, `issue_url`, complete `title`, complete `body`, observed `state` |
 | Comment | `owner`, `repo`, `issue_number`, returned `comment_id` |
 | Discovery | `repositories` with returned identities/URLs; actual pagination and incomplete-result indication; never silently present partial results as complete |
-| Publication | `owner`, `repo`, `issue_number`, `issue_url`, `PR_ID` (PR number), `PR_URL`, `SOURCE_COMMIT`, `BRANCH`, `WORKING_BRANCH` |
+| Publication | `owner`, `repo`, `issue_number`, `issue_url`, `issue_reference`, `PR_ID` (PR number), `PR_URL`, `SOURCE_COMMIT`, `BRANCH`, `WORKING_BRANCH` |
 | Finalization | retained publication identity, verified `merged` result, actual `merge_commit`, actual local synchronization result and working-branch commit |
 | Closure | explicit repository/issue identity and observed `state=closed`; otherwise an explicit unconfirmed outcome with nonzero exit |
 
@@ -141,9 +141,15 @@ write submission is insufficient to claim merge or closure.
 
 ## Validation and deployment prerequisites
 
-Run `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`,
-`uv run mypy .`, and `bash -n` on the two library scripts. Production never
-loads the fixtures or Python test code.
+For a composed application, review the component mapping and commands in
+`lean-sdd.toml`, then run `lean-sdd validate .` from the project root. This
+runs every required component and project-wide check. For legacy Python
+installations, follow the [root workflow](../AGENTS.md#3-validate-commit-and-record-implementation).
+
+For maintenance of the Lean-SDD repository itself, run `uv run pytest`,
+`uv run ruff check .`, `uv run ruff format --check .`, and `uv run mypy .`
+at the repository root. Run `bash -n` on each shell library in `.agents/lib/`.
+Production never loads the fixtures or Python test code.
 
 Remaining deployment prerequisites: explicitly selected GitHub repository,
 appropriate token/policy access to that repository, separately working Git

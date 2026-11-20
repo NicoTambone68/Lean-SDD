@@ -1,16 +1,30 @@
 """Local diagnostics must be informative without running project code."""
 
+import hashlib
 import json
 import os
+import socket
 import subprocess
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from typing import BinaryIO, TextIO
 
 import pytest
 
 from lean_sdd.cli import main
+from lean_sdd.configuration import InstallationIdentity
 from lean_sdd.doctor import diagnose
 from lean_sdd.installer import initialize
-from lean_sdd.templates import STATE_PATH, package_version, template_files
+from lean_sdd.profiles import PYTHON, Profile, ProfileRegistry, RequiredCheck
+from lean_sdd.templates import (
+    STATE_PATH,
+    ResolvedBundle,
+    installation_state,
+    package_version,
+    profile_installation_state,
+    template_files,
+)
 
 
 @pytest.fixture
@@ -40,8 +54,11 @@ def historical_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     payload[".agents/retired.md"] = b"Retired template\n"
     with monkeypatch.context() as older:
         older.setattr("lean_sdd.templates.package_version", lambda: "0.0.0")
-        older.setattr("lean_sdd.installer.template_files", lambda: payload)
-        initialize(tmp_path)
+        for name, content in payload.items():
+            path = tmp_path / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+        (tmp_path / STATE_PATH).write_bytes(installation_state(payload))
     return tmp_path
 
 
@@ -84,6 +101,45 @@ def test_invalid_install_record_is_not_interpreted_as_paths(tmp_path: Path) -> N
     checks = diagnose(tmp_path)
     assert checks[0].status == "FAIL"
     assert "Invalid installation record" in checks[0].message
+
+
+@pytest.mark.usefixtures("local_tools")
+@pytest.mark.parametrize("schema", [1, 2])
+@pytest.mark.parametrize("name", [".env", ".agents/.env.local"])
+def test_doctor_rejects_private_dotenv_before_opening_recorded_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    schema: int,
+    name: str,
+) -> None:
+    record = tmp_path / STATE_PATH
+    record.parent.mkdir()
+    payload = {"ordinary.md": b"ordinary"}
+    (tmp_path / "ordinary.md").write_bytes(payload["ordinary.md"])
+    (tmp_path / name).write_bytes(b"synthetic fixture content")
+    valid_record = (
+        installation_state(payload)
+        if schema == 1
+        else profile_installation_state(
+            payload,
+            template_version="0.0.0",
+            identity=InstallationIdentity(("retired",), "configured"),
+        )
+    )
+    state = json.loads(valid_record)
+    state["files"][name] = "a" * 64
+    original = json.dumps(state).encode("utf-8")
+    record.write_bytes(original)
+    modified = record.stat().st_mtime_ns
+    with guard_doctor_reads(monkeypatch, tmp_path / "ordinary.md", tmp_path / name):
+        assert main(["doctor", str(tmp_path)]) == 1
+    output = capsys.readouterr()
+    assert "FAIL: Invalid installation record: Private dotenv paths" in output.out
+    assert repr(name) in output.out
+    assert "synthetic fixture content" not in output.out + output.err
+    assert record.read_bytes() == original
+    assert record.stat().st_mtime_ns == modified
 
 
 def test_missing_prerequisites_fail_without_network(
@@ -176,6 +232,29 @@ def test_missing_retired_template_remains_a_failure(
     )
 
 
+@pytest.mark.usefixtures("local_tools")
+def test_previous_release_preserves_customized_retired_document(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    initialize(tmp_path)
+    name = ".agents/retired.md"
+    record = tmp_path / STATE_PATH
+    state = json.loads(record.read_text(encoding="utf-8"))
+    state["template_version"] = "0.3.0"
+    state["files"][name] = hashlib.sha256(b"Original instructions\n").hexdigest()
+    record.write_text(json.dumps(state), encoding="utf-8")
+    (tmp_path / name).write_bytes(b"Local instructions\n")
+    before = installation_snapshot(tmp_path)
+
+    assert main(["doctor", str(tmp_path)]) == 0
+    output = capsys.readouterr().out
+    assert f"WARN: Templates removed in current release: {name!r}" in output
+    assert f"WARN: Locally modified template: {name!r}" in output
+    assert main(["init", str(tmp_path)]) == 1
+    assert "no migration" in capsys.readouterr().err
+    assert installation_snapshot(tmp_path) == before
+
+
 @pytest.mark.parametrize("difference", ["added", "removed", "changed"])
 @pytest.mark.usefixtures("local_tools")
 def test_current_version_with_conflicting_manifest_fails(
@@ -206,7 +285,7 @@ def test_current_version_with_conflicting_manifest_fails(
         (b"{", "not valid JSON"),
         (b"\xff", "not valid UTF-8 JSON"),
         (b"x" * 1_000_001, "too large"),
-        (b'{"schema_version": 2}', "Unsupported installation record schema_version: 2"),
+        (b'{"schema_version": 3}', "Unsupported installation record schema_version: 3"),
         (
             json.dumps(
                 {
@@ -298,3 +377,659 @@ def test_invalid_doctor_invocation_still_exits_two() -> None:
     with pytest.raises(SystemExit) as error:
         main(["doctor", "--unsupported-option"])
     assert error.value.code == 2
+
+
+# Configuration fixtures contain executable-looking commands as inert data.
+def component_configuration(
+    components: tuple[tuple[str, str, tuple[str, ...]], ...],
+) -> str:
+    text = "schema_version = 1\n"
+    for name, path, profiles in components:
+        text += (
+            f"[components.{name}]\npath = {json.dumps(path)}\n"
+            f"profiles = {json.dumps(profiles)}\n"
+        )
+    for name, path, profiles in components:
+        for profile in profiles:
+            commands = (
+                [(r.category, r.argv) for r in PYTHON.required_checks]
+                if profile == "python"
+                else [("tests", ("fixture-command-must-not-run",))]
+            )
+            for category, argv in commands:
+                text += (
+                    f'\n[[checks]]\nname = "{name}-{profile}-{category}"\n'
+                    f'scope = "component"\ncomponent = "{name}"\n'
+                    f'profile = "{profile}"\n'
+                    f'category = "{category}"\ncwd = {json.dumps(path)}\n'
+                    f"argv = {json.dumps(argv)}\n"
+                    "required = true\ntimeout_seconds = 300\n"
+                )
+    return text
+
+
+def two_python_components(root: Path) -> None:
+    (root / "lean-sdd.toml").write_text(
+        component_configuration(
+            (
+                ("api", "src/api", ("python",)),
+                ("worker", "src/worker", ("python",)),
+            )
+        ),
+        encoding="utf-8",
+    )
+    initialize(root)
+    for name in ("api", "worker"):
+        (root / "src" / name).mkdir(parents=True)
+
+
+def application_checks(root: Path) -> list[tuple[str, str]]:
+    return [
+        (c.status, c.message)
+        for c in diagnose(root)
+        if c.message.startswith("Component ")
+    ]
+
+
+@pytest.mark.usefixtures("local_tools")
+def test_python_diagnostics_use_each_component_not_the_repository_root(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    two_python_components(tmp_path)
+    (tmp_path / "pyproject.toml").write_text("invalid root TOML", encoding="utf-8")
+    (tmp_path / "uv.lock").symlink_to(tmp_path / "absent")
+    api = tmp_path / "src/api"
+    (api / "pyproject.toml").write_text('[project]\nname = "api"\n', encoding="utf-8")
+    (api / "uv.lock").write_text(
+        "lock contents are not executed or freshness-checked", encoding="utf-8"
+    )
+    assert main(["doctor", str(tmp_path)]) == 0
+    output = capsys.readouterr().out
+    assert (
+        "Component api (src/api), profile python: Python project metadata is present"
+        in output
+    )
+    assert (
+        "Component api (src/api), profile python: uv.lock is readable and nonempty"
+        in output
+    )
+    assert (
+        "WARN: Component worker (src/worker), profile python: No pyproject.toml"
+        in output
+    )
+    assert "WARN: Component worker (src/worker), profile python: No uv.lock" in output
+    assert "invalid TOML" not in output
+    assert "Unsafe uv.lock" not in output
+    assert "Component root" not in output
+
+
+@pytest.mark.usefixtures("local_tools")
+def test_legacy_implicit_and_explicit_root_mappings_are_distinguished(
+    historical_project: Path,
+) -> None:
+    implicit = diagnose(historical_project)
+    assert any("Mapping origin: installed-legacy" in c.message for c in implicit)
+    assert any(
+        "Component root (.), profile python: No pyproject.toml" in c.message
+        for c in implicit
+    )
+    (historical_project / "lean-sdd.toml").write_text(
+        component_configuration((("app", ".", ("python",)),)),
+        encoding="utf-8",
+    )
+    explicit = diagnose(historical_project)
+    assert any("Mapping origin: explicit" in c.message for c in explicit)
+    assert any(
+        "Component app (.), profile python: No pyproject.toml" in c.message
+        for c in explicit
+    )
+    assert not any(c.status == "FAIL" for c in explicit)
+
+
+@pytest.mark.parametrize(
+    ("content", "status", "message"),
+    [
+        (b"[project]\nname='api'", "PASS", "metadata is present"),
+        (b"[tool.example]\nvalue=1", "WARN", "no [project] metadata"),
+        (b"project = false", "FAIL", "[project] must be a table"),
+        (b"[broken", "FAIL", "invalid TOML"),
+        (b"\xff", "FAIL", "not valid UTF-8"),
+        (b"x" * (1024 * 1024 + 1), "FAIL", "exceeds the 1 MiB limit"),
+        (b"value = " + b"[" * 2000 + b"]" * 2000, "FAIL", "invalid TOML"),
+    ],
+)
+@pytest.mark.usefixtures("local_tools")
+def test_python_metadata_failures_are_local_and_bounded(
+    tmp_path: Path,
+    content: bytes,
+    status: str,
+    message: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    two_python_components(tmp_path)
+    (tmp_path / "src/api/pyproject.toml").write_bytes(content)
+    assert main(["doctor", str(tmp_path)]) == (1 if status == "FAIL" else 0)
+    output = capsys.readouterr().out
+    assert f"{status}: Component api (src/api), profile python:" in output
+    assert message in output
+    assert "Component worker (src/worker), profile python: No pyproject.toml" in output
+    assert "Component api (src/api), profile python: No uv.lock" in output
+
+
+@pytest.mark.parametrize("name", ["pyproject.toml", "uv.lock"])
+@pytest.mark.parametrize("kind", ["symlink", "directory", "fifo"])
+@pytest.mark.usefixtures("local_tools")
+def test_component_metadata_rejects_unsafe_files_without_following_them(
+    tmp_path: Path, name: str, kind: str
+) -> None:
+    two_python_components(tmp_path)
+    path = tmp_path / "src/api" / name
+    if kind == "symlink":
+        path.symlink_to(tmp_path / "missing")
+    elif kind == "directory":
+        path.mkdir()
+    else:
+        os.mkfifo(path)
+    checks = application_checks(tmp_path)
+    assert (
+        "FAIL",
+        f"Component api (src/api), profile python: Unsafe {name} path; "
+        "use a regular file.",
+    ) in checks
+    assert any("Component worker" in message for _, message in checks)
+
+
+@pytest.mark.parametrize("kind", ["missing", "file", "symlink"])
+@pytest.mark.usefixtures("local_tools")
+def test_invalid_component_directories_fail_mapping_not_record_integrity(
+    tmp_path: Path, kind: str
+) -> None:
+    two_python_components(tmp_path)
+    path = tmp_path / "src/api"
+    path.rmdir()
+    if kind == "file":
+        path.write_text("not a directory", encoding="utf-8")
+    elif kind == "symlink":
+        path.symlink_to(tmp_path / "src/worker", target_is_directory=True)
+    checks = diagnose(tmp_path)
+    assert any(
+        c.status == "FAIL" and "Installed configuration: component api" in c.message
+        for c in checks
+    )
+    assert any(
+        c.status == "PASS" and "All recorded templates match" in c.message
+        for c in checks
+    )
+    assert any("Component profile diagnostics unavailable" in c.message for c in checks)
+    assert not any("Python project metadata" in c.message for c in checks)
+
+
+@pytest.mark.parametrize("mode", ["malformed", "unsupported", "missing"])
+@pytest.mark.usefixtures("local_tools")
+def test_bad_mapping_does_not_fall_back_to_python(
+    tmp_path: Path, mode: str, capsys: pytest.CaptureFixture[str]
+) -> None:
+    initialize(tmp_path)
+    config = tmp_path / "lean-sdd.toml"
+    if mode == "missing":
+        config.unlink()
+    elif mode == "malformed":
+        config.write_text("[broken", encoding="utf-8")
+    else:
+        config.write_text(
+            component_configuration((("app", ".", ("unsupported",)),)), encoding="utf-8"
+        )
+    assert main(["doctor", str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert "Installation record is valid (schema 2)" in output
+    assert "FAIL: Installed configuration:" in output
+    assert "Component profile diagnostics unavailable" in output
+    assert "No pyproject.toml" not in output
+
+
+@pytest.mark.parametrize("owned", [False, True])
+@pytest.mark.usefixtures("local_tools")
+def test_mapping_edits_are_separate_from_original_assets(
+    tmp_path: Path, owned: bool
+) -> None:
+    config = tmp_path / "lean-sdd.toml"
+    if not owned:
+        config.write_text(
+            component_configuration((("initial", ".", ("python",)),)), encoding="utf-8"
+        )
+    initialize(tmp_path)
+    record = (tmp_path / STATE_PATH).read_bytes()
+    config.write_text(
+        component_configuration(
+            (("api", "src/api", ("python",)), ("worker", "src/worker", ("python",)))
+        ),
+        encoding="utf-8",
+    )
+    for name in ("api", "worker"):
+        (tmp_path / "src" / name).mkdir(parents=True)
+    checks = diagnose(tmp_path)
+    assert not any(c.status == "FAIL" for c in checks)
+    assert any("matches current release" in c.message for c in checks)
+    assert (
+        any("Locally modified template: 'lean-sdd.toml'" in c.message for c in checks)
+        == owned
+    )
+    assert any("Component api (src/api), profile python" in c.message for c in checks)
+    assert any(
+        "Component worker (src/worker), profile python" in c.message for c in checks
+    )
+    assert (tmp_path / STATE_PATH).read_bytes() == record
+
+
+def inert_bundle(
+    selected: Iterable[str], *, registry: ProfileRegistry
+) -> ResolvedBundle:
+    """Local resource stand-in with a distinct asset for each requested profile."""
+    profiles = tuple(sorted(selected))
+    payload = {"common.md": b"common fixture asset"}
+    for profile in profiles:
+        registry.get(profile)
+        payload[f"{profile}.md"] = profile.encode("utf-8")
+    return ResolvedBundle(package_version(), profiles, payload)
+
+
+@pytest.fixture
+def inert_registry(monkeypatch: pytest.MonkeyPatch) -> ProfileRegistry:
+    registry = ProfileRegistry(
+        (PYTHON, Profile("fixture", "Inert fixture", (RequiredCheck("tests"),)))
+    )
+    monkeypatch.setattr("lean_sdd.doctor.resolve_bundle", inert_bundle)
+    return registry
+
+
+def install_inert(
+    root: Path, profiles: tuple[str, ...], registry: ProfileRegistry
+) -> None:
+    bundle = inert_bundle(profiles, registry=registry)
+    for name, content in bundle.payload.items():
+        (root / name).write_bytes(content)
+    (root / STATE_PATH).parent.mkdir()
+    (root / STATE_PATH).write_bytes(
+        profile_installation_state(
+            bundle.payload,
+            template_version=bundle.template_version,
+            identity=InstallationIdentity(bundle.profiles, "configured"),
+        )
+    )
+    (root / "lean-sdd.toml").write_text(
+        component_configuration((("app", ".", profiles),)), encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize("profiles", [("fixture",), ("fixture", "python")])
+@pytest.mark.usefixtures("local_tools")
+def test_static_dispatch_does_not_assign_python_to_other_profiles(
+    tmp_path: Path, inert_registry: ProfileRegistry, profiles: tuple[str, ...]
+) -> None:
+    install_inert(tmp_path, profiles, inert_registry)
+    checks = diagnose(tmp_path, registry=inert_registry)
+    assert not any(c.status == "FAIL" for c in checks)
+    assert any("matches current release" in c.message for c in checks)
+    assert any(
+        "Component app (.), profile fixture: Application diagnostics unavailable"
+        in c.message
+        for c in checks
+    )
+    assert any("No pyproject.toml" in c.message for c in checks) == (
+        "python" in profiles
+    )
+    assert any("No uv.lock" in c.message for c in checks) == ("python" in profiles)
+    assert any(c.message == "uv is available." for c in checks)
+
+
+@pytest.mark.usefixtures("local_tools")
+def test_shared_uv_remains_required_for_inert_non_python_profile(
+    tmp_path: Path, inert_registry: ProfileRegistry, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_inert(tmp_path, ("fixture",), inert_registry)
+    monkeypatch.setattr(
+        "lean_sdd.doctor.shutil.which",
+        lambda command: None if command == "uv" else f"/tools/{command}",
+    )
+    checks = diagnose(tmp_path, registry=inert_registry)
+    assert any(
+        c.status == "FAIL" and c.message == "Required command missing: uv"
+        for c in checks
+    )
+    assert not any("pyproject.toml" in c.message for c in checks)
+
+
+@pytest.mark.usefixtures("local_tools")
+def test_mapping_subset_does_not_change_release_profile_combination(
+    tmp_path: Path, inert_registry: ProfileRegistry
+) -> None:
+    install_inert(tmp_path, ("fixture", "python"), inert_registry)
+    record = (tmp_path / STATE_PATH).read_bytes()
+    (tmp_path / "lean-sdd.toml").write_text(
+        component_configuration((("app", ".", ("fixture",)),)), encoding="utf-8"
+    )
+    checks = diagnose(tmp_path, registry=inert_registry)
+    assert not any(c.status == "FAIL" for c in checks)
+    assert any("matches current release" in c.message for c in checks)
+    assert not any("pyproject.toml" in c.message for c in checks)
+    assert (tmp_path / STATE_PATH).read_bytes() == record
+
+
+@pytest.mark.usefixtures("local_tools")
+def test_known_but_uninstalled_mapping_profile_is_a_failure(
+    tmp_path: Path, inert_registry: ProfileRegistry
+) -> None:
+    install_inert(tmp_path, ("fixture",), inert_registry)
+    (tmp_path / "lean-sdd.toml").write_text(
+        component_configuration((("app", ".", ("python",)),)), encoding="utf-8"
+    )
+    checks = diagnose(tmp_path, registry=inert_registry)
+    assert any(
+        c.status == "FAIL" and "profiles that are not installed" in c.message
+        for c in checks
+    )
+    assert any("matches current release" in c.message for c in checks)
+    assert not any("No pyproject.toml" in c.message for c in checks)
+
+
+@pytest.mark.usefixtures("local_tools")
+def test_unavailable_historical_profile_still_reports_modified_and_missing_assets(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "original.md").write_bytes(b"original")
+    example = ".agents/.env.example"
+    payload = {
+        "original.md": b"original",
+        "missing.md": b"missing",
+        example: b"example",
+    }
+    (tmp_path / STATE_PATH).parent.mkdir()
+    (tmp_path / example).write_bytes(payload[example])
+    (tmp_path / STATE_PATH).write_bytes(
+        profile_installation_state(
+            payload,
+            template_version="0.0.0",
+            identity=InstallationIdentity(("retired",), "configured"),
+        )
+    )
+    (tmp_path / "original.md").write_bytes(b"customized")
+    checks = diagnose(tmp_path)
+    assert any(
+        c.status == "PASS" and "Installation record is valid" in c.message
+        for c in checks
+    )
+    assert any(
+        c.status == "WARN" and "Locally modified template: 'original.md'" in c.message
+        for c in checks
+    )
+    assert any(
+        c.status == "PASS"
+        and f"Installed template matches recorded hash: {example!r}" in c.message
+        for c in checks
+    )
+    assert any(
+        c.status == "FAIL" and "Missing installed template: 'missing.md'" in c.message
+        for c in checks
+    )
+    assert any(
+        c.status == "FAIL"
+        and "bundle unavailable: Unsupported profile: retired" in c.message
+        for c in checks
+    )
+    assert any("Component profile diagnostics unavailable" in c.message for c in checks)
+    assert not any(
+        "Invalid installation record" in c.message or "pyproject.toml" in c.message
+        for c in checks
+    )
+
+
+def installation_snapshot(root: Path) -> dict[str, tuple[bytes | None, int, int, int]]:
+    result = {}
+    for path in (root, *root.rglob("*")):
+        metadata = path.stat()
+        result[str(path.relative_to(root))] = (
+            path.read_bytes() if path.is_file() else None,
+            metadata.st_mode,
+            metadata.st_mtime_ns,
+            metadata.st_ctime_ns,
+        )
+    return result
+
+
+@contextmanager
+def guard_doctor_reads(
+    monkeypatch: pytest.MonkeyPatch, *blocked_paths: Path
+) -> Iterator[None]:
+    original_open = Path.open
+
+    @contextmanager
+    def read_only(
+        self: Path,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> Iterator[BinaryIO | TextIO]:
+        assert self.name != ".env" and self not in blocked_paths, (
+            f"Unexpected read of {self.name!r}"
+        )
+        assert mode in ("r", "rb"), "Doctor opened a file for writing"
+        with (
+            original_open(self, "rb", buffering)
+            if mode == "rb"
+            else original_open(self, "r", buffering, encoding, errors, newline)
+        ) as stream:
+            yield stream
+            if self.name == "uv.lock":
+                assert stream.tell() <= 1, "Lockfile observation read past the prefix"
+
+    with monkeypatch.context() as patch:
+        patch.setattr(Path, "open", read_only)
+        yield
+
+
+def test_diagnostics_never_load_secrets_execute_project_code_or_contact_network(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    two_python_components(tmp_path)
+    marker = tmp_path / "must-not-exist"
+    script = f"from pathlib import Path; Path({str(marker)!r}).touch()"
+    (tmp_path / "src/api/uv.lock").write_bytes(
+        b"version = 1\n" + b"# comment\n" * 120_000
+    )
+    (tmp_path / "src/worker/uv.lock").write_bytes(b"")
+    (tmp_path / "src/api/project_hook.py").write_text(script, encoding="utf-8")
+    (tmp_path / "src/api/pyproject.toml").write_text(
+        '[project]\nname="api"\n[build-system]\nrequires=[]\n'
+        'build-backend="project_hook"\nbackend-path=["."]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / ".agents/.env").write_text(
+        f"touch '{marker}'\nSECRET=do-not-read-me\n", encoding="utf-8"
+    )
+    config = tmp_path / "lean-sdd.toml"
+    with config.open("a", encoding="utf-8") as stream:
+        stream.write(
+            '\n[[checks]]\nname="sentinel"\nscope="project"\n'
+            'category="side-effects"\ncwd="."\nrequired=false\ntimeout_seconds=1\n'
+            + "argv="
+            + json.dumps(["python", "-c", script])
+            + "\n"
+        )
+    startup = tmp_path / "startup.sh"
+    startup.write_text(f"touch '{marker}'", encoding="utf-8")
+    monkeypatch.setenv("BASH_ENV", str(startup))
+    monkeypatch.setenv("ENV", str(startup))
+    monkeypatch.setenv("BASH_FUNC_printf%%", f"() {{ touch '{marker}'; }}")
+    monkeypatch.setenv("GIT_TRACE", str(marker))
+    monkeypatch.setenv("GIT_TRACE2_EVENT", str(marker))
+    monkeypatch.setenv("GITHUB_TOKEN", "secret-value-must-not-be-printed")
+    before = installation_snapshot(tmp_path)
+    original_run = subprocess.run
+    calls: list[tuple[str, ...]] = []
+
+    def observed_run(
+        arguments: list[str],
+        *,
+        cwd: Path,
+        env: dict[str, str],
+        capture_output: bool,
+        text: bool,
+        timeout: int,
+        check: bool,
+    ) -> subprocess.CompletedProcess[str]:
+        assert cwd == tmp_path
+        assert capture_output and text and timeout == 10 and not check
+        assert not any(k.startswith(("GIT_", "BASH_FUNC_")) for k in env)
+        assert "BASH_ENV" not in env and "ENV" not in env
+        executable = Path(arguments[0])
+        assert executable.is_absolute() and not executable.is_relative_to(tmp_path)
+        if executable.name == "bash":
+            assert arguments[1:] == [
+                "--noprofile",
+                "--norc",
+                "-p",
+                "-c",
+                'printf "%s" "$BASH_VERSION"',
+            ]
+        else:
+            assert executable.name == "git"
+            assert arguments[1:] == ["rev-parse", "--show-toplevel"]
+        calls.append(tuple(arguments))
+        return original_run(
+            arguments,
+            cwd=cwd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+
+    def no_network(*args: object, **kwargs: object) -> None:
+        pytest.fail("Doctor attempted network access")
+
+    with guard_doctor_reads(monkeypatch), monkeypatch.context() as patch:
+        patch.setattr(subprocess, "run", observed_run)
+        patch.setattr(socket, "create_connection", no_network)
+        patch.setattr(socket.socket, "connect", no_network)
+        checks = diagnose(tmp_path)
+    assert [c.message for c in checks if c.status == "FAIL"] == [
+        "Component worker (src/worker), profile python: uv.lock is empty."
+    ]
+    assert any(
+        c.status == "PASS"
+        and "Component api (src/api), profile python: uv.lock is readable and nonempty."
+        == c.message
+        for c in checks
+    )
+    assert calls  # Executes only the fixed real system observations above.
+    assert not marker.exists()
+    assert not any(
+        "secret-value" in c.message or "do-not-read-me" in c.message for c in checks
+    )
+    assert installation_snapshot(tmp_path) == before
+
+
+@pytest.mark.parametrize("relative_path", [False, True])
+def test_shared_observations_refuse_executables_inside_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, relative_path: bool
+) -> None:
+    initialize(tmp_path)
+    binary = tmp_path / "bin"
+    binary.mkdir()
+    marker = tmp_path / "executed"
+    for name in ("bash", "git"):
+        path = binary / name
+        path.write_text(f"#!/bin/sh\ntouch '{marker}'\n", encoding="utf-8")
+        path.chmod(0o755)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(
+        "PATH",
+        ("bin" if relative_path else str(binary))
+        + os.pathsep
+        + os.environ.get("PATH", ""),
+    )
+    checks = diagnose(tmp_path)
+    assert any(
+        c.status == "FAIL" and "Cannot inspect Bash version" in c.message
+        for c in checks
+    )
+    assert any(
+        c.status == "FAIL" and "Cannot inspect Git worktree" in c.message
+        for c in checks
+    )
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("failure", ["timeout", "unreadable"])
+@pytest.mark.usefixtures("local_tools")
+def test_shared_observation_errors_preserve_independent_results(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    initialize(tmp_path)
+
+    def fail(arguments: list[str], target: Path) -> subprocess.CompletedProcess[str]:
+        if failure == "timeout":
+            raise subprocess.TimeoutExpired(arguments, 10, output="secret-output")
+        raise PermissionError("secret-error")
+
+    monkeypatch.setattr("lean_sdd.doctor._run", fail)
+    checks = diagnose(tmp_path)
+    assert sum(c.status == "FAIL" for c in checks) == 2
+    assert any("All recorded templates match" in c.message for c in checks)
+    assert any("No pyproject.toml" in c.message for c in checks)
+    assert not any("secret" in c.message for c in checks)
+
+
+@pytest.mark.parametrize("name", ["pyproject.toml", "uv.lock"])
+@pytest.mark.usefixtures("local_tools")
+def test_unreadable_metadata_reports_component_without_losing_other_results(
+    tmp_path: Path, deny_file_read: Callable[[Path], None], name: str
+) -> None:
+    two_python_components(tmp_path)
+    metadata = tmp_path / "src/api" / name
+    metadata.write_text("[project]", encoding="utf-8")
+    deny_file_read(metadata)
+    checks = diagnose(tmp_path)
+    assert any(
+        c.status == "FAIL"
+        and f"Component api (src/api), profile python: Cannot read {name}" in c.message
+        for c in checks
+    )
+    assert any(
+        "Component worker (src/worker), profile python: No pyproject.toml" in c.message
+        for c in checks
+    )
+    assert not any("private filesystem" in c.message for c in checks)
+
+
+@pytest.mark.parametrize(
+    ("name", "message"),
+    [
+        ("pyproject.toml", "Cannot read pyproject.toml"),
+        ("uv.lock", "Cannot read uv.lock"),
+        (STATE_PATH, "Cannot read installation record"),
+        ("AGENTS.md", "Cannot read installed template: 'AGENTS.md'"),
+    ],
+)
+@pytest.mark.usefixtures("local_tools")
+def test_inaccessible_file_metadata_is_not_reported_as_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, message: str
+) -> None:
+    initialize(tmp_path)
+    path = tmp_path / name
+    if not path.exists():
+        path.write_text("", encoding="utf-8")
+    original = Path.lstat
+
+    def inaccessible(self: Path) -> os.stat_result:
+        if self == path:
+            raise PermissionError("private access details")
+        return original(self)
+
+    monkeypatch.setattr(Path, "lstat", inaccessible)
+    checks = diagnose(tmp_path)
+    assert any(c.status == "FAIL" and message in c.message for c in checks)
+    assert not any("private access details" in c.message for c in checks)

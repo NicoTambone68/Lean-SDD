@@ -1,7 +1,7 @@
-# Lean-SDD: Agent-Assisted Spec Driven Development on GitHub
+# Lean-SDD — GitHub Agent-Assisted Development
 
 Lean-SDD provides an issue-driven development workflow for coding agents working
-on Python projects. It connects a written specification to implementation,
+on Python and TypeScript projects. It connects a written specification to implementation,
 validation, human review, and verified completion through GitHub issues and
 pull requests.
 
@@ -31,14 +31,25 @@ It also aims to be **as system agnostic as practical**. Skills use Bash scripts
 and common command-line tools rather than a model-specific runtime. Portability
 still requires uv, a compatible Bash environment, Git, curl, and jq; the current
 service integration targets GitHub MCP, and the supplied engineering rules and
-validation commands target Python projects.
+validation commands cover Python and Node/npm TypeScript projects.
 
-Although conceived for Python projects, Lean-SDD can be readily adapted to any
-programming language by updating `CONSTITUTION.md`, `AGENTS.md`, and
-`CODING_STANDARDS.md` for that language and its toolchain. The issue-driven
-workflow and GitHub integration are independent of the application language.
+Python and TypeScript are production profiles. New languages require their own reviewed
+standards, static registry integration, diagnostics, packaging and actual toolchain
+acceptance. Profiles supplement the shared workflow without replacing Python
+rules or weakening governance. The GitHub integration is language independent.
 See [adapting to another language](#adapting-to-another-language) for the
 supporting configuration and documentation to review.
+
+The [component configuration contract](docs/configuration.md) defines strict
+profile mappings and validation-check configuration, with complete root and
+two-component Python examples. `lean-sdd languages` lists supported profiles;
+initialization consumes this configuration but never executes its checks.
+The [TypeScript contract](docs/typescript.md) documents its Node/npm requirements
+and mixed component layouts.
+
+The [bundled profile resource API](docs/profiles.md) composes common assets and
+selected language standards for fresh installations. Existing version-1 installations keep
+their legacy layout and records without migration.
 
 Other, more sophisticated SDD tools and frameworks are available and may be
 better suited to your application, team size, or process requirements. Lean-SDD
@@ -78,63 +89,89 @@ Bash skills perform individual operations. All GitHub service operations use
 the configured official GitHub MCP server; local Git handles branches, commits,
 fetching, pushing, and synchronization with separate Git credentials.
 
+Before using the workflow in a new project, follow the
+[setup and readiness guide](.agents/README.md#validation-and-readiness).
+
 ## Install the CLI
 
-Lean-SDD is available on [PyPI](https://pypi.org/project/lean-sdd/).
-
-The installer requires Python 3.11 or newer and
-[uv](https://docs.astral.sh/uv/).
-
-Install the latest published release:
+The installer requires Python 3.11 or newer and uv. Install the published CLI
+from PyPI into uv's isolated tool environment:
 
 ```bash
 uv tool install lean-sdd
 ```
 
-Verify the installation:
+To install the version in a local checkout, run this from the repository root:
 
 ```bash
-lean-sdd --version
+uv tool install .
 ```
 
-If the executable directory is not on your PATH, run
-`uv tool update-shell` and restart your shell.
-
-To upgrade an existing installation:
-
-```bash
-uv tool upgrade lean-sdd
-```
+Both install the `lean-sdd` command. To install a wheel you have built, use
+`uv tool install /path/to/lean_sdd-0.3.5-py3-none-any.whl`. Run
+`lean-sdd --version` to check the installed version. If the executable
+directory is missing from your PATH, run `uv tool update-shell` and restart
+your shell. If uv reports that a previous checkout installation owns the
+executable, remove it with `uv tool uninstall lean-sdd-cli` before installing
+`lean-sdd`.
 
 Initialize a separate target project:
 
 ```bash
-lean-sdd init /path/to/project --dry-run
-lean-sdd init /path/to/project
+lean-sdd languages
+lean-sdd init /path/to/project --language python --dry-run
+lean-sdd init /path/to/project --language python
 lean-sdd doctor /path/to/project
 ```
 
-Both commands default to the current directory when the path is omitted.
-`init` installs the governing documents, six skills, shared Bash libraries,
-configuration example, and setup references. It creates missing directories,
+`init` and `doctor` default to the current directory when the path is omitted.
+`init` reports the selected profiles and component mapping in both real and dry
+runs. An existing `lean-sdd.toml` selects the profile union; `--language python`
+is optional and must agree with a single Python component at `.`. For multiple
+components, supply the explicit mapping and omit `--language`. Python and
+TypeScript are supported; unknown languages fail before writing.
+For Node/npm projects, use `--language typescript` and review the
+[TypeScript support contract](docs/typescript.md). It covers Node ESM/CommonJS
+on Linux, five required npm checks, and mixed Python/TypeScript components.
+
+Fresh installs without TOML default to Python and generate a root configuration
+with its four required checks. Existing TOML is preserved byte-for-byte. `init`
+installs the governing documents and selected standards at `.agents/standards/<profile>.md`,
+six skills, shared Bash libraries, environment example, and setup references. It creates missing directories,
 preserves identical existing files, and refuses the entire operation before
 writing if any managed file conflicts. It rejects symbolic links in destination
 paths. There is no overwrite flag or automatic upgrade; compare a fresh install
 in a separate directory when adapting existing project rules. Do not modify the
 target concurrently during initialization.
 
-The installer records the template version and original file hashes in
-`.agents/lean-sdd-install.json`. Commit this record with the installed workflow.
+Fresh installs record schema version 2, the template release, installed profiles,
+configuration mode, and original managed-file hashes in
+`.agents/lean-sdd-install.json`. Generated TOML is hashed; user-provided TOML is
+not claimed as an installed asset. Commit the record and configuration with the
+workflow. Repeat initialization preserves the recorded hashes even after valid
+configuration edits, and never rewrites component mappings or switches profiles.
+A configured installation missing its TOML fails instead of regenerating defaults.
+See [record ownership and reinitialization](docs/configuration.md#initialization-and-record-ownership).
 It also adds `.agents/.gitignore` to exclude local environment files and logs.
 Existing `.env`, project README, application files, and Git configuration are
 preserved. Installation does not provision a repository, select a working
 branch, create issues, scaffold an application, or contact GitHub.
 
 `doctor` checks installed files, local prerequisites, exported MCP configuration,
-and basic Python project metadata. It never loads `.env`, runs project scripts,
+and selected Python/TypeScript project metadata. It never loads `.env`, runs project scripts,
 or makes network requests. It validates the installation record independently
 of the current CLI release, then checks each recorded file against its original
-SHA-256 hash. Existing schema-version-1 records need no migration.
+SHA-256 hash. Both schema versions 1 and 2 are supported; existing version-1
+records need no migration. Diagnostics validate the component mapping against
+installed identity, then inspect Python metadata and read one byte of each
+declared Python component's lockfile to check it is readable and nonempty.
+A legacy installation without TOML keeps its implicit root Python component.
+Missing application manifests/lockfiles are
+warnings; invalid mappings, component directories, and malformed metadata fail.
+Unavailable installed profiles produce a compatibility failure while their
+recorded file hashes remain inspectable, rather than a malformed-record error.
+See the [diagnostic reference](docs/diagnostics.md) for observation boundaries,
+metadata limits, and why a setup warning may still block later validation.
 
 - `PASS`: The installed file matches its recorded original content. A record
   with the current template version and identical manifest also passes.
@@ -146,8 +183,12 @@ SHA-256 hash. Existing schema-version-1 records need no migration.
 - `FAIL`: A record is malformed or uses an unsupported schema, a path is unsafe
   (including symbolic links), a recorded file is missing or unreadable, or a
   required tool is missing. A record claiming the current template version but
-  containing a different manifest also fails and identifies the discrepancies.
+  containing a different template manifest also fails and identifies the
+  discrepancies. Invalid/missing required configuration or unavailable installed
+  profiles also fail. A customized generated TOML is compared with its original
+  recorded hash, not with today's default configuration.
 
+Older CLI releases need not understand schema version 2.
 Updating the CLI does not update a project's installed templates or its record.
 An installation-version warning does not by itself indicate corruption or
 require immediate migration. Files introduced only in the newer release are
@@ -165,6 +206,32 @@ diagnostic do not establish live GitHub readiness.
 Skill invocations require uv for environment-file loading and Bash 4 or newer
 plus Git, curl, jq, awk, grep, and mktemp. On Windows, use a compatible
 environment such as WSL for the complete workflow; installing the Python CLI alone does not supply these prerequisites.
+
+## Execute reviewed validation
+
+After reviewing the current rules and `lean-sdd.toml`, explicitly run:
+
+```bash
+lean-sdd validate /path/to/project
+```
+
+Execution currently requires Linux. The command prepares the entire required
+suite before launching a process, then runs checks sequentially by check name.
+Python components retain the four mandatory uv/pytest/Ruff/mypy commands; all
+required project checks also run. Missing Python manifests or lockfiles block
+validation even though doctor reports their absence as setup warnings.
+
+Ordinary failures and timeouts remain visible while later runnable checks
+continue. Required unsuccessful or unrun checks prevent success; optional
+failures alone do not. Cancellation stops the suite and cleans the active process
+group. Child output streams directly to the invoking terminal; commands and
+inherited credentials must be reviewed before running. The runner does not load
+`.env`, install anything independently, retry commands, or grant trust to project
+code. Commands themselves can modify files, synchronize dependencies, or use
+network/credential access available to the invoking user.
+
+See the [execution contract](docs/validation.md) for preflight requirements,
+result states, exit codes, cleanup guarantees and limitations, and output handling.
 
 ## Principles and responsibilities
 
@@ -230,8 +297,7 @@ application manages its own Python environment separately.
 An adopting Python project additionally supplies its application code under
 `src/`, tests, `pyproject.toml`, and dependency lockfile. Those application and
 test artifacts are not generated in the target by the installer. The tests in
-this repository exercise the installer itself. Installed projects receive a
-readiness checklist for verifying their own setup.
+this repository exercise the installer itself.
 
 ## Python project management with uv
 
@@ -251,23 +317,20 @@ commit `uv.lock`, and keep the generated `.venv/` out of version control. The
 lockfile records resolved dependency versions for consistent installations.
 See [uv project structure and files](https://docs.astral.sh/uv/concepts/projects/layout/).
 
-Use `uv sync` to synchronize the project environment and `uv run` to execute
-project commands. Both normally update the lockfile and environment as needed;
-when validation must reject changes to the lockfile, use their `--locked`
-option. See [uv locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/)
-for the exact behavior. Declare pytest, Ruff, and mypy as development dependencies
-for the supplied Python validation workflow.
+Declare pytest, Ruff, and mypy as development dependencies. Before validation,
+run `uv sync --locked` to prepare the environment and reject a stale lockfile.
+Then run the four mandatory Python checks with their exact arguments as listed
+in the [configuration guide](docs/configuration.md). [uv locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/)
 
 ## Workflow and approval gates
 
 **Code created or modified by the agent is never merged automatically.** After
 publication approval, the agent creates a pull request for human review. The
-user must explicitly instruct the agent to merge the retained source revision.
-This instruction satisfies the workflow's merge approval gate. GitHub review
-requirements are enforced separately under repository policy; a GitHub
-"Approve" review alone does not instruct the agent to merge. Passing tests or
-approval to publish also does not authorize a merge. While a review decision is
-pending, the pull request remains unmerged; silence is not approval.
+pull request must receive explicit human approval to merge the reviewed source
+revision; passing tests or approval to publish does not authorize a merge. A
+rejected pull request is discarded by closing it without merging, on explicit
+human instruction. While a review decision is pending, the pull request remains
+unmerged; silence is not approval.
 
 The normal lifecycle has **three separate human approval gates**:
 
@@ -334,7 +397,12 @@ that directory must be part of the approved scope.
 
 ### 3. Validate, commit, and record implementation
 
-The Python project validation required by `AGENTS.md` runs from the project root:
+For composed applications, review all applicable standards and `lean-sdd.toml`,
+including command changes, then run `lean-sdd validate .` from the project root.
+It executes all required component and project checks; focused checks do not
+replace the final gate. Supply and review interface tests for interacting components.
+
+This Lean-SDD repository and legacy Python installations retain these root commands:
 
 ```bash
 uv run pytest
@@ -378,16 +446,10 @@ The whole result must survive the approval pause unchanged. After the PR
 checkpoint succeeds, the agent reports the PR URL, source, base, and approved
 commit, then stops for separate merge approval.
 
-If the reviewer requests revisions, keep the PR open and stop the merge path
-for an explicit recovery decision. The normal scripts do not implement a
-revision and resubmission workflow. A revised source commit requires renewed
-validation and approval of that source before publication or merge; never
-overwrite retained approval state or rerun publication against an existing PR
-to bypass recovery.
-
-If the user instead decides to abandon the change, close the PR without merging
-only on an explicit instruction. Closing it does not complete the workflow,
-automatically delete the branch, or close the related issue as completed.
+If the reviewer rejects the change, the merge phase does not run. Discarding the
+PR is a separate, explicitly instructed action rather than successful
+finalization; it does not automatically delete the branch or close the related
+issue as completed.
 
 ### 5. Merge the approved source and synchronize
 
@@ -396,14 +458,8 @@ local and remote identities, PR state, checks, reviews, and mergeability.
 The merge request uses the retained `SOURCE_COMMIT` as `expectedHeadSha` and
 `merge_method=merge`. The current implementation has no squash or rebase
 fallback. Missing expected-head protection or blocked, pending, or unknown
-mergeability stops the operation. The script checks all observed commit statuses
-and check runs, including checks that repository policy does not mark required.
-Failed, pending, unknown, or incomplete observations block the merge. Check runs
-must finish with success, neutral, or skipped outcomes; the latest substantive
-review from each reviewer must not request changes. An empty check-run list means
-no check runs were observed; a combined pending status with zero status contexts
-means no commit statuses were observed. GitHub remains authoritative for
-server-side policy; empty observations do not prove policy approval.
+required diagnostics stop the operation. GitHub remains authoritative for
+server-side policy; an empty observed check set does not prove policy approval.
 
 After merging, the script independently verifies the PR and merge commit,
 fetches the retained base, checks merge ancestry, and synchronizes the local
@@ -490,7 +546,8 @@ Before live operations, use the read-only procedure in
 [setup and readiness](.agents/README.md#environment-and-capability-verification)
 to verify the deployed tool schemas, authenticated identity, and both publication
 and merge capability contracts. Repeat phase checks after approval pauses as
-specified by the skills.
+specified by the skills. Historical tool observations are not a guarantee of
+current server capabilities.
 
 Local `.agents/.env` files must remain untracked. The supplied `.gitignore`
 ignores `.env` files and preserves `.env.example`; keep equivalent protection
@@ -514,41 +571,30 @@ looks successful. Stop dependent operations and preserve known effects and
 uncertainty. Never guess an identity or automatically repeat uncertain issue,
 comment, PR, merge, or closure writes.
 
-When a required operation fails after a known issue exists and before closure
-begins, record one factual failure checkpoint as specified in `AGENTS.md`.
-If an audit comment itself fails, report it and stop without another audit
-attempt. If closure fails or cannot be confirmed, report the observed state or
-uncertainty without assuming the issue is open or closed.
+After a known issue exists and before closure begins, record one factual failure
+checkpoint as specified in `AGENTS.md`. If that comment fails, report it and stop
+without another audit attempt. If closure fails or cannot be confirmed, report
+the observed state or uncertainty without claiming the issue is open or closed.
 Missing or mismatched approval state requires explicit recovery; new observations
 must not silently replace the approved values.
 
 ## Adopting the workflow
 
-1. Install Python 3.11 or newer, uv, Bash 4 or newer, Git, curl, jq, awk, grep,
-   and mktemp. Install the CLI as described in [Install the CLI](#install-the-cli)
-   and make `lean-sdd` and the required tools available on your PATH.
-2. Start with an already provisioned GitHub repository and a usable local clone.
+1. Start with an already provisioned GitHub repository and a usable local clone.
    Explicitly select its owner, repository, and existing working/base branch.
    Provisioning, remote replacement, and history migration are separate work.
-3. Run `lean-sdd init` to install the governing documents and `.agents/`. Review
+2. Run `lean-sdd init` to install the governing documents and `.agents/`. Review
    existing project rules and reconcile conflicts explicitly; the installer
    refuses to overwrite an existing constitution or other differing files.
-4. Provide application source under `src/`, project tests, dependency metadata,
+3. Provide application source under `src/`, project tests, dependency metadata,
    and the required validation tools. The workflow bundle does not create the
-   application scaffold or its Python environment. Prepare that environment as
-   described in [Python project management with uv](#python-project-management-with-uv).
-5. Configure MCP credentials in the untracked `.agents/.env` and independent
-   Git authentication. Commit the installed workflow files, installation record,
-   and intended project setup through the repository's authorized setup process,
-   keeping credentials untracked. Complete any required publication and review
-   so the selected local base and its origin branch contain the setup and are
-   synchronized before the first issue branch is prepared. Branch preparation
-   requires a clean worktree, including untracked files, and rejects a local
-   base that is ahead of or divergent from origin. The installer does not
-   commit or publish this setup.
-6. Verify the effective origin URLs, selected base, deployed MCP contracts, and
+   application scaffold or its Python environment.
+4. Install Bash, Git, curl, and jq, and configure MCP credentials plus independent
+   Git authentication. Install `uv` and prepare the adopting Python project's
+   environment as described in [Python project management with uv](#python-project-management-with-uv).
+5. Verify the effective origin URLs, selected base, deployed MCP contracts, and
    identity through the documented setup procedure.
-7. Perform an explicitly authorized acceptance run in a disposable project,
+6. Perform an explicitly authorized acceptance run in a disposable project,
    observing all three real approval pauses and separate verified issue closure.
    Record actual results before claiming readiness.
 
@@ -559,44 +605,24 @@ operation contracts consistent.
 
 ### Adapting to another language
 
-The main adaptation is in the project rules and validation environment:
+Add one language through a dedicated issue using the
+[profile-authoring contract](docs/profiles.md#adding-a-future-bundled-profile).
+Preserve one constitution, workflow and shared standards, plus every applicable
+language standard. Do not replace Python's rules or validation with another
+language's commands. Required constitutional changes need separate explicit
+amendment approval. Reuse the six core Bash skills and their uv environment-file
+loader; declare any added skills and assets explicitly.
 
-- **`CONSTITUTION.md`:** update Python-specific wording and runtime support
-  requirements. Review the mandatory `src/` boundary against the target
-  language's layout; changing it requires an explicit constitutional amendment.
-  Preserve the general correctness, security, verification, and reliability
-  principles, and record approved amendments with their rationale and version.
-- **`CODING_STANDARDS.md`:** replace Python idioms, typing, packaging, and tool
-  requirements with the target language's conventions and quality standards.
-- **`AGENTS.md`:** update language references and replace the application
-  validation commands (`uv run pytest`, Ruff, and mypy) with the target project's
-  build, test, lint, format, and applicable static-analysis commands. Preserve
-  the `uv run --no-project --env-file .agents/.env -- bash` prefix used to invoke
-  workflow skills. Keep engineering rules in the two rule documents and
-  preserve the issue workflow, approval gates, and failure handling here.
-- **Project configuration:** supply the target ecosystem's dependency manifests,
-  lockfiles, build configuration, tests, and any CI checks. Review `.gitignore`
-  for language-specific build outputs, caches, and local environment files.
-  This bundle does not supply an application scaffold or CI configuration.
-- **Supporting documentation:** update this README and `.agents/README.md` for
-  the new setup and validation commands. Review validation references in the
-  MCP, issue, and finalization contract documents linked below. Record validation
-  and acceptance results for the adapted project.
-
-`lean-sdd doctor` still checks for Python project metadata and `uv.lock`; editing
-the workflow documents does not change these CLI checks. A non-Python project
-without those files will receive warnings for their absence. Interpret those
-warnings in the context of the chosen language and verify its dependencies and
-toolchain separately. Continue to resolve applicable workflow and credential
-configuration diagnostics; the CLI has no language-selection option.
-
-The existing Bash skills and shared libraries handle Git and GitHub MCP
-operations without running the application's Python checks, so changing the
-application language does not normally require rewriting them. Their uv, Bash,
-Git, curl, jq, and GitHub MCP prerequisites still apply; uv remains the
-environment-file loader even for non-Python applications. Verify the adapted
-validation commands and complete the acceptance workflow before claiming the
-new configuration is ready.
+[Constitutional clarification #10](https://github.com/NicoTambone68/Lean-SDD/issues/10)
+is incorporated in Constitution 2.0.1: component-local source roots remain within
+repository root `src/`, including when components use the same language.
+[TypeScript #11](https://github.com/NicoTambone68/Lean-SDD/issues/11) adds the
+[Node/npm profile](docs/typescript.md) in 0.3.0, with real ESM/CommonJS, multiple
+TypeScript components and Python/TypeScript message acceptance. Root and multiple
+components work for both profiles, including both profiles on one component. Native Windows/macOS
+validation and automatic template migration are not supported. See the
+[foundation acceptance matrix](docs/foundation-acceptance.md) for evidence and
+remaining acceptance boundaries.
 
 ## Developing and packaging the installer
 
@@ -615,10 +641,8 @@ The package exposes `lean-sdd` through the `lean_sdd.cli:main` entry point.
 Hatchling's explicit file mappings in `pyproject.toml` bundle the authoritative
 root documents and `.agents/` files as the `lean_sdd_templates` resource namespace.
 The CLI reads those installed resources without requiring a source checkout.
-The small files under `src/lean_sdd/template_overrides/` provide the installed
-readiness checklist and local ignore rules. The build uses a file allowlist,
-not a recursive copy of local `.agents/` state; update that list when adding a
-workflow asset.
+The build uses an explicit allowlist for workflow assets. Update the mappings
+when adding an asset.
 
 After editing template files, refresh the editable installation's bundled
 resources with `uv sync --reinstall-package lean-sdd` before testing.
@@ -627,36 +651,16 @@ failure cleanup, diagnostics, links, Bash syntax, wheel contents, rebuilding a
 wheel from the source archive, and isolated `uv tool install` execution. Build
 tests use uv's local cache without network access after development setup.
 
-`uv build` creates a wheel and source archive in `dist/`.
-This prepares release artifacts locally; it does not
-publish the package.
-
-Lean-SDD is distributed through
-[PyPI](https://pypi.org/project/lean-sdd/).
-Publishing is handled through GitHub Actions using
-PyPI Trusted Publishing.
-
-Before publishing a new version, update the package
-version in `pyproject.toml`, complete the required
-tests and release review, and verify the published
-artifacts.
-
-Upgrading the CLI does not automatically update
-workflow files in previously initialized projects.
+`uv build` creates a wheel and source archive in `dist/`. Local development
+may be ahead of PyPI between releases. Publish selected versions as `lean-sdd`
+after the relevant release review and live workflow acceptance.
+Upgrading the CLI does not update previously initialized projects automatically.
 
 ## Validation and further reading
 
-For an adopting Python project, run the four checks in
-[Validate, commit, and record implementation](#3-validate-commit-and-record-implementation):
-pytest, Ruff linting, Ruff formatting, and mypy through `uv run`. Add checks
-required by the project's specification. The `uv build` command in the installer
-development section packages Lean-SDD itself; adopting projects need a package
-build only when their own requirements call for one. For Bash changes, include
-syntax checks and relevant deterministic operational tests.
-
-Offline checks cannot prove live permissions, server behavior, or real
-human approval pauses. Live acceptance is side-effecting and requires explicit
-authorization.
+For composed applications, use reviewed `lean-sdd validate .` with all required
+component/project checks. For this repository, run the four maintenance commands.
+For Bash changes, include syntax checks and relevant deterministic operational tests.
 
 Detailed contracts:
 
