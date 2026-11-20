@@ -375,6 +375,37 @@ def test_wheel_and_sdist_install_without_checkout(
     assert typescript_state["profiles"] == ["typescript"]
     assert (typescript_target / ".agents/standards/typescript.md").is_file()
     assert not (typescript_target / ".agents/standards/python.md").exists()
+    guide = typescript_target / ".agents/github-mcp-contract.md"
+    content = guide.read_text(encoding="utf-8")
+    section = content.split("## Validation and deployment prerequisites", 1)[1]
+    application, maintenance = section.split(
+        "For maintenance of the Lean-SDD repository", 1
+    )
+    assert "`lean-sdd validate .`" in application
+    assert "every required component and project-wide check" in application
+    assert "legacy Python" in application and "(../AGENTS.md#" in application
+    for command in (
+        "uv run pytest",
+        "uv run ruff check .",
+        "uv run ruff format --check .",
+        "uv run mypy .",
+        "bash -n",
+    ):
+        assert command in maintenance and command not in application
+    for link in re.findall(r"\]\(([^)]+)\)", content):
+        if "://" in link:
+            continue
+        relative, _, anchor = link.partition("#")
+        destination = guide.parent / relative if relative else guide
+        assert destination.is_file(), link
+        if anchor:
+            headings = re.findall(
+                r"^#{1,6} (.+)$", destination.read_text(encoding="utf-8"), re.MULTILINE
+            )
+            assert anchor in {
+                re.sub(r"[^\w -]", "", heading.lower()).replace(" ", "-")
+                for heading in headings
+            }, link
     assert not (typescript_target / "package.json").exists()
     assert not (typescript_target / "src").exists()
     typescript_record = (typescript_target / STATE_PATH).read_bytes()
@@ -478,7 +509,7 @@ def test_wheel_and_sdist_install_without_checkout(
     (target / "src/api/pyproject.toml").write_text(
         '[project]\nname="api"\n', encoding="utf-8"
     )
-    (target / "src/api/uv.lock").write_text("", encoding="utf-8")
+    (target / "src/api/uv.lock").write_text("version=1\n", encoding="utf-8")
     (target / "pyproject.toml").write_text("[broken", encoding="utf-8")
     component_result = run([str(executable), "doctor", str(target)], tmp_path, env)
     assert (

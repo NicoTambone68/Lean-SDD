@@ -108,7 +108,7 @@ uv tool install .
 ```
 
 Both install the `lean-sdd` command. To install a wheel you have built, use
-`uv tool install /path/to/lean_sdd-0.3.3-py3-none-any.whl`. Run
+`uv tool install /path/to/lean_sdd-0.3.4-py3-none-any.whl`. Run
 `lean-sdd --version` to check the installed version. If the executable
 directory is missing from your PATH, run `uv tool update-shell` and restart
 your shell. If uv reports that a previous checkout installation owns the
@@ -163,9 +163,10 @@ or makes network requests. It validates the installation record independently
 of the current CLI release, then checks each recorded file against its original
 SHA-256 hash. Both schema versions 1 and 2 are supported; existing version-1
 records need no migration. Diagnostics validate the component mapping against
-installed identity, then inspect Python metadata and lockfile presence at each
-declared Python component root. A legacy installation without TOML keeps its
-implicit root Python component. Missing application manifests/lockfiles are
+installed identity, then inspect Python metadata and read one byte of each
+declared Python component's lockfile to check it is readable and nonempty.
+A legacy installation without TOML keeps its implicit root Python component.
+Missing application manifests/lockfiles are
 warnings; invalid mappings, component directories, and malformed metadata fail.
 Unavailable installed profiles produce a compatibility failure while their
 recorded file hashes remain inspectable, rather than a malformed-record error.

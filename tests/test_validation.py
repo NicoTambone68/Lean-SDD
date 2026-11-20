@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -65,10 +66,14 @@ def fixture_project(
     root: Path, checks: str, *, profiles: tuple[str, ...] = ("fixture",)
 ) -> None:
     root.mkdir(parents=True, exist_ok=True)
-    (root / STATE_PATH).parent.mkdir()
+    standards = {REGISTRY.get(name).standards_path: b"inert" for name in profiles}
+    for name, content in standards.items():
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
     (root / STATE_PATH).write_bytes(
         profile_installation_state(
-            {"rules.md": b"inert"},
+            standards,
             template_version="historical",
             identity=InstallationIdentity(profiles, "configured"),
         )
@@ -195,6 +200,9 @@ def test_root_python_preserves_all_four_mandatory_commands(
         (root / STATE_PATH).write_bytes(installation_state(payload))
     else:
         initialize(root)
+        (root / PYTHON.standards_path).write_text(
+            "Reviewed local rules", encoding="utf-8"
+        )
     python_setup(root)
     before = (root / STATE_PATH).read_bytes()
     assert main(["validate", str(root)]) == 0
@@ -213,6 +221,69 @@ def test_root_python_preserves_all_four_mandatory_commands(
         ]
     ]
     assert (root / STATE_PATH).read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "change",
+    ["unrecorded", "missing", "symlink", "parent-link", "directory", "unreadable"],
+)
+def test_cli_blocks_all_checks_when_installed_standards_are_unavailable(
+    tmp_path: Path,
+    inert_uv: Path,
+    capsys: pytest.CaptureFixture[str],
+    deny_file_read: Callable[[Path], None],
+    change: str,
+) -> None:
+    root = tmp_path / "project"
+    initialize(root)
+    python_setup(root)
+    standards = root / PYTHON.standards_path
+    if change == "unrecorded":
+        record = root / STATE_PATH
+        state = json.loads(record.read_bytes())
+        del state["files"][PYTHON.standards_path]
+        record.write_text(json.dumps(state), encoding="utf-8")
+    elif change == "parent-link":
+        moved = standards.parent.rename(tmp_path / "standards")
+        standards.parent.symlink_to(moved, target_is_directory=True)
+    elif change == "unreadable":
+        deny_file_read(standards)
+    else:
+        standards.unlink()
+        if change == "symlink":
+            standards.symlink_to(root / "AGENTS.md")
+        elif change == "directory":
+            standards.mkdir()
+    assert main(["validate", str(root)]) == 1
+    output = capsys.readouterr()
+    assert f"Profile python standards {PYTHON.standards_path}" in output.err
+    assert output.out.count("not-run:") == 4
+    assert not inert_uv.exists()
+
+
+def test_cli_preserves_completed_results_if_standard_disappears_between_checks(
+    tmp_path: Path, inert_uv: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = tmp_path / "project"
+    initialize(root)
+    python_setup(root)
+    with (root / "lean-sdd.toml").open("a", encoding="utf-8") as stream:
+        stream.write(
+            check_text(
+                "a-remove-standard",
+                python_command(
+                    "from pathlib import Path; "
+                    f"Path({PYTHON.standards_path!r}).unlink()"
+                ),
+                component=None,
+            )
+        )
+    assert main(["validate", str(root)]) == 1
+    output = capsys.readouterr()
+    assert "passed: a-remove-standard" in output.out
+    assert output.out.count("not-run:") == 4
+    assert PYTHON.standards_path in output.err
+    assert not inert_uv.exists()
 
 
 def test_multiple_python_components_and_required_integration(
