@@ -21,7 +21,7 @@ from lean_sdd.configuration import (
     validate_directories,
 )
 from lean_sdd.installer import InstallError, check_path
-from lean_sdd.profiles import BUILTIN_PROFILES, ProfileRegistry
+from lean_sdd.profiles import BUILTIN_PROFILES, Profile, ProfileRegistry
 from lean_sdd.templates import STATE_PATH, parse_installation_state
 from lean_sdd.typescript import inspect_typescript
 
@@ -59,6 +59,7 @@ class ValidationPlan:
     checks: tuple[PlannedCheck, ...]
     environment: Mapping[str, str] = field(repr=False)
     problems: tuple[str, ...]
+    standards_profiles: tuple[Profile, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -128,6 +129,18 @@ def _python_preconditions(config: Configuration, root: Path) -> None:
         _regular_file(root / component.path / "uv.lock", f"{context} uv.lock")
 
 
+def _check_profile_standards(root: Path, profiles: tuple[Profile, ...]) -> None:
+    for profile in profiles:
+        path = root / profile.standards_path
+        label = f"Profile {profile.id} standards {profile.standards_path}"
+        _regular_file(path, label)
+        try:
+            with path.open("rb", buffering=0) as stream:
+                stream.read(1)
+        except OSError as error:
+            raise ConfigurationError(f"{label}: cannot read installed file.") from error
+
+
 def _typescript_preconditions(config: Configuration, root: Path) -> None:
     for component in config.components:
         if "typescript" not in component.profiles:
@@ -150,6 +163,7 @@ def check_execution_boundaries(plan: ValidationPlan) -> None:
             "Validation execution requires Linux and the main thread."
         )
     validate_directories(plan.configuration, plan.root, require_exists=True)
+    _check_profile_standards(plan.root, plan.standards_profiles)
     _python_preconditions(plan.configuration, plan.root)
     _typescript_preconditions(plan.configuration, plan.root)
 
@@ -212,6 +226,17 @@ def prepare_validation(
         for check in resolved.configuration.checks
     )
     problems: list[str] = []
+    standards_profiles = (
+        tuple(registry.get(name) for name in resolved.configuration.profiles)
+        if installed.schema_version == 2
+        else ()
+    )
+    for profile in standards_profiles:
+        if profile.standards_path not in installed.files:
+            problems.append(
+                f"Profile {profile.id} standards {profile.standards_path} "
+                "missing from installation record."
+            )
     if (
         sys.platform != "linux"
         or threading.current_thread() is not threading.main_thread()
@@ -222,6 +247,7 @@ def prepare_validation(
         )
     try:
         validate_directories(resolved.configuration, root, require_exists=True)
+        _check_profile_standards(root, standards_profiles)
         _python_preconditions(resolved.configuration, root)
         _typescript_preconditions(resolved.configuration, root)
     except ConfigurationError as error:
@@ -233,7 +259,12 @@ def prepare_validation(
                 "inspect its argv and PATH."
             )
     return ValidationPlan(
-        root, resolved.configuration, checks, MappingProxyType(env), tuple(problems)
+        root,
+        resolved.configuration,
+        checks,
+        MappingProxyType(env),
+        tuple(problems),
+        standards_profiles,
     )
 
 

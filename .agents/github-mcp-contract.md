@@ -141,9 +141,15 @@ write submission is insufficient to claim merge or closure.
 
 ## Validation and deployment prerequisites
 
-Run `uv run pytest`, `uv run ruff check .`, `uv run ruff format --check .`,
-`uv run mypy .`, and `bash -n` on the two library scripts. Production never
-loads the fixtures or Python test code.
+For a composed application, review the component mapping and commands in
+`lean-sdd.toml`, then run `lean-sdd validate .` from the project root. This
+runs every required component and project-wide check. For legacy Python
+installations, follow the [root workflow](../AGENTS.md#3-validate-commit-and-record-implementation).
+
+For maintenance of the Lean-SDD repository itself, run `uv run pytest`,
+`uv run ruff check .`, `uv run ruff format --check .`, and `uv run mypy .`
+at the repository root. Run `bash -n` on each shell library in `.agents/lib/`.
+Production never loads the fixtures or Python test code.
 
 Remaining deployment prerequisites: explicitly selected GitHub repository,
 appropriate token/policy access to that repository, separately working Git

@@ -18,6 +18,12 @@ Historical records are not rewritten or compared to today's release hashes as a
 condition of execution: reviewed local rules and template customization remain
 user-owned. Use doctor separately to inspect original asset integrity.
 
+For schema 2, each configured profile's standards file under `.agents/standards/`
+must appear in the installation record and be a readable regular file at its
+declared path. Missing entries, missing files, symbolic links, directories, and
+read errors block the entire suite. Reviewed local edits are allowed. Schema 1
+uses its historical Python layout.
+
 The complete mapping/check schema is validated before any process launches:
 mandatory categories, required status, exact Python argv, the TypeScript npm-run
 adapter, scope, profile membership,
@@ -76,11 +82,12 @@ required checks, each with a 300-second timeout. Their names sort as
 Python configuration uses that same plan. An explicit mapping may use different
 check names, so its alphabetical order can differ.
 
-The plan snapshots configuration and environment at invocation. Directories and
-required profile metadata are checked again immediately before each launch. A changed
-boundary or required-file precondition stops execution and leaves remaining
-checks not run. The runner never reloads changed command definitions to execute
-new instructions mid-suite. Avoid concurrent project/PATH changes; these checks
+The plan snapshots configuration and environment at invocation. Directories,
+installed standards files, and required profile metadata are checked again
+immediately before each launch. A changed boundary or required-file precondition
+stops execution and leaves remaining checks not run. The runner never reloads
+changed command definitions to execute new instructions mid-suite.
+Avoid concurrent project/PATH changes; these checks
 are not protection against a hostile process racing filesystem operations.
 
 ## Results and exit status

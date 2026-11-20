@@ -64,10 +64,10 @@ nesting), oversized input, or a non-table `project` entry fail. Missing
 presence check, not full package-metadata, dependency, or build-system validation.
 No build backend is imported.
 
-Doctor also checks that `uv.lock`, when present, is a regular file at that
-component's root. A missing lockfile warns; an unsafe path or inspection error
-fails. It does not parse lock contents, check freshness, resolve dependencies,
-inspect a virtual environment, or invoke Python, uv, pytest, Ruff, or mypy.
+Doctor checks for a regular `uv.lock` at each Python component root and reads
+one byte. A successful read confirms the file is readable and nonempty,
+regardless of its size. A missing lockfile warns. An empty file, unsafe path,
+or read error fails. Dependency resolution and lock freshness are uv's responsibility.
 A metadata failure in one component does not suppress another component's
 observations or that component's independent lockfile observation.
 

@@ -157,7 +157,10 @@ def test_single_component_real_checks(
 
 @pytest.mark.parametrize("layout", ["two-typescript", "mixed", "both-profiles"])
 def test_composed_application_real_checks(
-    tmp_path: Path, installed_typescript: Path, layout: str
+    tmp_path: Path,
+    installed_typescript: Path,
+    layout: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     components: list[tuple[str, str, tuple[str, ...]]]
     if layout == "both-profiles":
@@ -180,8 +183,36 @@ def test_composed_application_real_checks(
             ("worker", "src/worker", ("typescript",)),
             ("api", "src/api", profiles),
         ]
-    (tmp_path / "lean-sdd.toml").write_text(configuration(components), encoding="utf-8")
+    mapping = configuration(components)
+    if layout == "mixed":
+        mapping += """
+[[checks]]
+name = "z-shared-contract"
+scope = "project"
+category = "integration"
+cwd = "src/api"
+argv = ["uv", "run", "pytest", "tests/test_contract.py"]
+required = true
+timeout_seconds = 120
+"""
+    (tmp_path / "lean-sdd.toml").write_text(mapping, encoding="utf-8")
     initialize(tmp_path, registry=REGISTRY)
+    if layout == "mixed":
+        monkeypatch.setenv("LEAN_SDD_TYPESCRIPT_PEER", str(peer))
+        monkeypatch.setenv("UV_FROZEN", "true")
+        monkeypatch.setenv("UV_PYTHON_DOWNLOADS", "never")
+        argv = ["lean-sdd", "validate", "."]
+        report = command(argv, tmp_path)
+        assert report.count("passed:") == 10
+        assert "passed: z-shared-contract" in report
+        standard = REGISTRY.get("typescript").standards_path
+        (tmp_path / standard).unlink()
+        blocked = subprocess.run(
+            argv, cwd=tmp_path, capture_output=True, text=True, timeout=30, check=False
+        )
+        assert blocked.returncode == 1 and blocked.stdout.count("not-run:") == 10
+        assert f"Profile typescript standards {standard}" in blocked.stderr
+        return
     result = execute(tmp_path, peer=peer)
     assert result.exit_code == 0, result
     assert all(item.status == "passed" for item in result.checks)

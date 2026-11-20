@@ -5,7 +5,8 @@ import json
 import os
 import socket
 import subprocess
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import BinaryIO, TextIO
 
@@ -409,7 +410,10 @@ def test_python_diagnostics_use_each_component_not_the_repository_root(
         "Component api (src/api), profile python: Python project metadata is present"
         in output
     )
-    assert "Component api (src/api), profile python: uv.lock is present" in output
+    assert (
+        "Component api (src/api), profile python: uv.lock is readable and nonempty"
+        in output
+    )
     assert (
         "WARN: Component worker (src/worker), profile python: No pyproject.toml"
         in output
@@ -748,6 +752,10 @@ def test_diagnostics_never_load_secrets_execute_project_code_or_contact_network(
     two_python_components(tmp_path)
     marker = tmp_path / "must-not-exist"
     script = f"from pathlib import Path; Path({str(marker)!r}).touch()"
+    (tmp_path / "src/api/uv.lock").write_bytes(
+        b"version = 1\n" + b"# comment\n" * 120_000
+    )
+    (tmp_path / "src/worker/uv.lock").write_bytes(b"")
     (tmp_path / "src/api/project_hook.py").write_text(script, encoding="utf-8")
     (tmp_path / "src/api/pyproject.toml").write_text(
         '[project]\nname="api"\n[build-system]\nrequires=[]\n'
@@ -779,6 +787,7 @@ def test_diagnostics_never_load_secrets_execute_project_code_or_contact_network(
     original_run = subprocess.run
     calls: list[tuple[str, ...]] = []
 
+    @contextmanager
     def read_only(
         self: Path,
         mode: str = "r",
@@ -786,19 +795,17 @@ def test_diagnostics_never_load_secrets_execute_project_code_or_contact_network(
         encoding: str | None = None,
         errors: str | None = None,
         newline: str | None = None,
-    ) -> BinaryIO | TextIO:
+    ) -> Iterator[BinaryIO | TextIO]:
         assert self.name != ".env", "Doctor loaded a secret file"
         assert mode in ("r", "rb"), "Doctor opened a file for writing"
-        if mode == "rb":
-            return original_open(self, "rb", buffering=buffering)
-        return original_open(
-            self,
-            "r",
-            buffering=buffering,
-            encoding=encoding,
-            errors=errors,
-            newline=newline,
-        )
+        with (
+            original_open(self, "rb", buffering)
+            if mode == "rb"
+            else original_open(self, "r", buffering, encoding, errors, newline)
+        ) as stream:
+            yield stream
+            if self.name == "uv.lock":
+                assert stream.tell() <= 1, "Lockfile observation read past the prefix"
 
     def observed_run(
         arguments: list[str],
@@ -847,7 +854,15 @@ def test_diagnostics_never_load_secrets_execute_project_code_or_contact_network(
         patch.setattr(socket, "create_connection", no_network)
         patch.setattr(socket.socket, "connect", no_network)
         checks = diagnose(tmp_path)
-    assert not any(c.status == "FAIL" for c in checks)
+    assert [c.message for c in checks if c.status == "FAIL"] == [
+        "Component worker (src/worker), profile python: uv.lock is empty."
+    ]
+    assert any(
+        c.status == "PASS"
+        and "Component api (src/api), profile python: uv.lock is readable and nonempty."
+        == c.message
+        for c in checks
+    )
     assert calls  # Executes only the fixed real system observations above.
     assert not marker.exists()
     assert not any(
@@ -907,43 +922,19 @@ def test_shared_observation_errors_preserve_independent_results(
     assert not any("secret" in c.message for c in checks)
 
 
+@pytest.mark.parametrize("name", ["pyproject.toml", "uv.lock"])
 @pytest.mark.usefixtures("local_tools")
 def test_unreadable_metadata_reports_component_without_losing_other_results(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, deny_file_read: Callable[[Path], None], name: str
 ) -> None:
     two_python_components(tmp_path)
-    metadata = tmp_path / "src/api/pyproject.toml"
+    metadata = tmp_path / "src/api" / name
     metadata.write_text("[project]", encoding="utf-8")
-    original = Path.open
-
-    def fail_metadata(
-        self: Path,
-        mode: str = "r",
-        buffering: int = -1,
-        encoding: str | None = None,
-        errors: str | None = None,
-        newline: str | None = None,
-    ) -> BinaryIO | TextIO:
-        if self == metadata:
-            raise PermissionError("private filesystem detail")
-        if mode == "rb":
-            return original(self, "rb", buffering=buffering)
-        assert mode == "r"
-        return original(
-            self,
-            "r",
-            buffering=buffering,
-            encoding=encoding,
-            errors=errors,
-            newline=newline,
-        )
-
-    monkeypatch.setattr(Path, "open", fail_metadata)
+    deny_file_read(metadata)
     checks = diagnose(tmp_path)
     assert any(
         c.status == "FAIL"
-        and "Component api (src/api), profile python: Cannot read pyproject.toml"
-        in c.message
+        and f"Component api (src/api), profile python: Cannot read {name}" in c.message
         for c in checks
     )
     assert any(
@@ -957,7 +948,7 @@ def test_unreadable_metadata_reports_component_without_losing_other_results(
     ("name", "message"),
     [
         ("pyproject.toml", "Cannot read pyproject.toml"),
-        ("uv.lock", "Cannot inspect uv.lock"),
+        ("uv.lock", "Cannot read uv.lock"),
         (STATE_PATH, "Cannot read installation record"),
         ("AGENTS.md", "Cannot read installed template: 'AGENTS.md'"),
     ],

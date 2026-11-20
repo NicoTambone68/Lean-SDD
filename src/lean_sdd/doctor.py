@@ -379,17 +379,23 @@ def _python_checks(target: Path, component: Component) -> list[Check]:
         checks.append(Check("FAIL", "Cannot read pyproject.toml; check file access."))
     lock = root / "uv.lock"
     try:
-        checks.append(
-            Check("PASS", "uv.lock is present; freshness not checked.")
-            if _regular_file_exists(lock)
-            else Check(
-                "WARN", "No uv.lock; lock the project dependencies before validation."
+        if not _regular_file_exists(lock):
+            checks.append(
+                Check(
+                    "WARN",
+                    "No uv.lock; lock the project dependencies before validation.",
+                )
             )
-        )
+        else:
+            with lock.open("rb", buffering=0) as stream:
+                if stream.read(1):
+                    checks.append(Check("PASS", "uv.lock is readable and nonempty."))
+                else:
+                    checks.append(Check("FAIL", "uv.lock is empty."))
     except InstallError:
         checks.append(Check("FAIL", "Unsafe uv.lock path; use a regular file."))
     except OSError:
-        checks.append(Check("FAIL", "Cannot inspect uv.lock; check file access."))
+        checks.append(Check("FAIL", "Cannot read uv.lock; check file access."))
     return checks
 
 

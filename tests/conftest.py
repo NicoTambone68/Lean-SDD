@@ -1,5 +1,9 @@
 """Keep real external-tool acceptance explicit and separate from unit tests."""
 
+from collections.abc import Callable
+from pathlib import Path
+from typing import BinaryIO, TextIO
+
 import pytest
 
 # These project tests run only inside the explicit cross-language harness.
@@ -26,3 +30,37 @@ def pytest_collection_modifyitems(
                     reason="Real toolchain acceptance needs --run-typescript"
                 )
             )
+
+
+@pytest.fixture
+def deny_file_read(monkeypatch: pytest.MonkeyPatch) -> Callable[[Path], None]:
+    """Simulate a read denial at open even when tests run as a privileged user."""
+
+    def deny(unreadable: Path) -> None:
+        original = Path.open
+
+        def fail_metadata(
+            self: Path,
+            mode: str = "r",
+            buffering: int = -1,
+            encoding: str | None = None,
+            errors: str | None = None,
+            newline: str | None = None,
+        ) -> BinaryIO | TextIO:
+            if self == unreadable:
+                raise PermissionError("private filesystem detail")
+            if mode == "rb":
+                return original(self, "rb", buffering=buffering)
+            assert mode == "r"
+            return original(
+                self,
+                "r",
+                buffering=buffering,
+                encoding=encoding,
+                errors=errors,
+                newline=newline,
+            )
+
+        monkeypatch.setattr(Path, "open", fail_metadata)
+
+    return deny
